@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Card, CardContent } from "@/components/ui/card";
 import { Construction } from "lucide-react";
 
-export const Route = createFileRoute("/_app/contas")({
+export const Route = createFileRoute("/app/contas")({
   component: ComingSoon,
 });
 

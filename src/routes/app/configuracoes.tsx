@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/_app/configuracoes")({
+export const Route = createFileRoute("/app/configuracoes")({
   component: SettingsPage,
 });
 
