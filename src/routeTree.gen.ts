@@ -13,12 +13,12 @@ import { Route as SignupRouteImport } from './routes/signup'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AppIndexRouteImport } from './routes/app/index'
-import { Route as AppTransacoesRouteImport } from './routes/app/transacoes'
-import { Route as AppOrcamentosRouteImport } from './routes/app/orcamentos'
-import { Route as AppContasRouteImport } from './routes/app/contas'
-import { Route as AppConfiguracoesRouteImport } from './routes/app/configuracoes'
-import { Route as AppCategoriasRouteImport } from './routes/app/categorias'
+import { Route as AppIndexRouteImport } from './routes/app.index'
+import { Route as AppTransacoesRouteImport } from './routes/app.transacoes'
+import { Route as AppOrcamentosRouteImport } from './routes/app.orcamentos'
+import { Route as AppContasRouteImport } from './routes/app.contas'
+import { Route as AppConfiguracoesRouteImport } from './routes/app.configuracoes'
+import { Route as AppCategoriasRouteImport } from './routes/app.categorias'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
