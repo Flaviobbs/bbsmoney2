@@ -25,7 +25,7 @@ import { Plus, Trash2, Search } from "lucide-react";
 import { formatCurrency, todayISO } from "@/lib/format";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/_app/transacoes")({
+export const Route = createFileRoute("/app/transacoes")({
   component: TransactionsPage,
 });
 

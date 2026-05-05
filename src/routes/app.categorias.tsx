@@ -24,7 +24,7 @@ import {
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/_app/categorias")({
+export const Route = createFileRoute("/app/categorias")({
   component: CategoriesPage,
 });
 
