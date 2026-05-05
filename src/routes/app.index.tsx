@@ -1,12 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import { formatCurrency, monthLabel } from "@/lib/format";
+import { formatCurrency, monthLabel, formatDate, todayISO } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   ArrowDownRight,
   ArrowUpRight,
+  CalendarClock,
   PiggyBank,
   Wallet,
 } from "lucide-react";
@@ -42,11 +44,19 @@ interface CatRow {
   color: string;
   type: "income" | "expense";
 }
+interface UpcomingBill {
+  id: string;
+  description: string;
+  amount: number;
+  due_date: string;
+  type: "income" | "expense";
+}
 
 function Dashboard() {
   const { user } = useAuth();
   const [tx, setTx] = useState<TxRow[]>([]);
   const [cats, setCats] = useState<CatRow[]>([]);
+  const [upcoming, setUpcoming] = useState<UpcomingBill[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -55,16 +65,29 @@ function Dashboard() {
       const since = new Date();
       since.setMonth(since.getMonth() - 6);
       since.setDate(1);
-      const [{ data: t }, { data: c }] = await Promise.all([
+      const today = todayISO();
+      const in7 = new Date();
+      in7.setDate(in7.getDate() + 7);
+      const in7ISO = in7.toISOString().slice(0, 10);
+      const [{ data: t }, { data: c }, { data: ub }] = await Promise.all([
         supabase
           .from("transactions")
           .select("id,type,amount,date,description,category_id")
           .gte("date", since.toISOString().slice(0, 10))
           .order("date", { ascending: false }),
         supabase.from("categories").select("id,name,color,type"),
+        supabase
+          .from("bills")
+          .select("id,description,amount,due_date,type")
+          .eq("status", "pending")
+          .gte("due_date", today)
+          .lte("due_date", in7ISO)
+          .order("due_date", { ascending: true })
+          .limit(5),
       ]);
       setTx((t ?? []) as TxRow[]);
       setCats((c ?? []) as CatRow[]);
+      setUpcoming((ub ?? []) as UpcomingBill[]);
       setLoading(false);
     };
     load();
@@ -217,6 +240,47 @@ function Dashboard() {
                   </li>
                 );
               })}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <CalendarClock className="h-4 w-4 text-primary" /> Próximas contas (7 dias)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {upcoming.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Nenhuma conta com vencimento nos próximos 7 dias.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border/50">
+              {upcoming.map((b) => (
+                <li key={b.id} className="flex items-center justify-between py-3">
+                  <Link to="/app/contas" className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{b.description}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Vence em {formatDate(b.due_date)}
+                    </div>
+                  </Link>
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline" className="bg-warning/15 text-warning border-warning/30">
+                      Pendente
+                    </Badge>
+                    <div
+                      className={`tabular-nums font-semibold ${
+                        b.type === "income" ? "text-success" : "text-destructive"
+                      }`}
+                    >
+                      {b.type === "income" ? "+" : "−"}
+                      {formatCurrency(Number(b.amount))}
+                    </div>
+                  </div>
+                </li>
+              ))}
             </ul>
           )}
         </CardContent>
