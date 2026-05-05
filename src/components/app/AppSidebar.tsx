@@ -22,14 +22,14 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/lib/auth";
 
-const items = [
+const items: { title: string; url: string; icon: typeof LayoutDashboard; exact?: boolean }[] = [
   { title: "Dashboard", url: "/app", icon: LayoutDashboard, exact: true },
   { title: "Transações", url: "/app/transacoes", icon: ArrowLeftRight },
   { title: "Contas", url: "/app/contas", icon: CalendarClock },
   { title: "Orçamentos", url: "/app/orcamentos", icon: Target },
   { title: "Categorias", url: "/app/categorias", icon: Tags },
   { title: "Configurações", url: "/app/configuracoes", icon: Settings },
-] as const;
+];
 
 export function AppSidebar() {
   const path = useRouterState({ select: (s) => s.location.pathname });
