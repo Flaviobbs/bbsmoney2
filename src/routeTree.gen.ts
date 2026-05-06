@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppTransacoesRouteImport } from './routes/app.transacoes'
 import { Route as AppOrcamentosRouteImport } from './routes/app.orcamentos'
+import { Route as AppMetasRouteImport } from './routes/app.metas'
 import { Route as AppContasRouteImport } from './routes/app.contas'
 import { Route as AppConfiguracoesRouteImport } from './routes/app.configuracoes'
 import { Route as AppCategoriasRouteImport } from './routes/app.categorias'
@@ -55,6 +56,11 @@ const AppOrcamentosRoute = AppOrcamentosRouteImport.update({
   path: '/orcamentos',
   getParentRoute: () => AppRoute,
 } as any)
+const AppMetasRoute = AppMetasRouteImport.update({
+  id: '/metas',
+  path: '/metas',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppContasRoute = AppContasRouteImport.update({
   id: '/contas',
   path: '/contas',
@@ -79,6 +85,7 @@ export interface FileRoutesByFullPath {
   '/app/categorias': typeof AppCategoriasRoute
   '/app/configuracoes': typeof AppConfiguracoesRoute
   '/app/contas': typeof AppContasRoute
+  '/app/metas': typeof AppMetasRoute
   '/app/orcamentos': typeof AppOrcamentosRoute
   '/app/transacoes': typeof AppTransacoesRoute
   '/app/': typeof AppIndexRoute
@@ -90,6 +97,7 @@ export interface FileRoutesByTo {
   '/app/categorias': typeof AppCategoriasRoute
   '/app/configuracoes': typeof AppConfiguracoesRoute
   '/app/contas': typeof AppContasRoute
+  '/app/metas': typeof AppMetasRoute
   '/app/orcamentos': typeof AppOrcamentosRoute
   '/app/transacoes': typeof AppTransacoesRoute
   '/app': typeof AppIndexRoute
@@ -103,6 +111,7 @@ export interface FileRoutesById {
   '/app/categorias': typeof AppCategoriasRoute
   '/app/configuracoes': typeof AppConfiguracoesRoute
   '/app/contas': typeof AppContasRoute
+  '/app/metas': typeof AppMetasRoute
   '/app/orcamentos': typeof AppOrcamentosRoute
   '/app/transacoes': typeof AppTransacoesRoute
   '/app/': typeof AppIndexRoute
@@ -117,6 +126,7 @@ export interface FileRouteTypes {
     | '/app/categorias'
     | '/app/configuracoes'
     | '/app/contas'
+    | '/app/metas'
     | '/app/orcamentos'
     | '/app/transacoes'
     | '/app/'
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/app/categorias'
     | '/app/configuracoes'
     | '/app/contas'
+    | '/app/metas'
     | '/app/orcamentos'
     | '/app/transacoes'
     | '/app'
@@ -140,6 +151,7 @@ export interface FileRouteTypes {
     | '/app/categorias'
     | '/app/configuracoes'
     | '/app/contas'
+    | '/app/metas'
     | '/app/orcamentos'
     | '/app/transacoes'
     | '/app/'
@@ -203,6 +215,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrcamentosRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/metas': {
+      id: '/app/metas'
+      path: '/metas'
+      fullPath: '/app/metas'
+      preLoaderRoute: typeof AppMetasRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/contas': {
       id: '/app/contas'
       path: '/contas'
@@ -231,6 +250,7 @@ interface AppRouteChildren {
   AppCategoriasRoute: typeof AppCategoriasRoute
   AppConfiguracoesRoute: typeof AppConfiguracoesRoute
   AppContasRoute: typeof AppContasRoute
+  AppMetasRoute: typeof AppMetasRoute
   AppOrcamentosRoute: typeof AppOrcamentosRoute
   AppTransacoesRoute: typeof AppTransacoesRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -240,6 +260,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCategoriasRoute: AppCategoriasRoute,
   AppConfiguracoesRoute: AppConfiguracoesRoute,
   AppContasRoute: AppContasRoute,
+  AppMetasRoute: AppMetasRoute,
   AppOrcamentosRoute: AppOrcamentosRoute,
   AppTransacoesRoute: AppTransacoesRoute,
   AppIndexRoute: AppIndexRoute,
