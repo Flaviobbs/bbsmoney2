@@ -5,6 +5,7 @@ import {
   CalendarClock,
   Target,
   Tags,
+  Trophy,
   Settings,
   LogOut,
   Wallet,
@@ -27,6 +28,7 @@ const items: { title: string; url: string; icon: typeof LayoutDashboard; exact?:
   { title: "Transações", url: "/app/transacoes", icon: ArrowLeftRight },
   { title: "Contas", url: "/app/contas", icon: CalendarClock },
   { title: "Orçamentos", url: "/app/orcamentos", icon: Target },
+  { title: "Metas", url: "/app/metas", icon: Trophy },
   { title: "Categorias", url: "/app/categorias", icon: Tags },
   { title: "Configurações", url: "/app/configuracoes", icon: Settings },
 ];
