@@ -44,6 +44,42 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_insights: {
+        Row: {
+          created_at: string
+          id: string
+          model: string | null
+          period_end: string
+          period_start: string
+          recommendations: Json
+          risk_alerts: Json
+          summary: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          model?: string | null
+          period_end: string
+          period_start: string
+          recommendations?: Json
+          risk_alerts?: Json
+          summary: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          model?: string | null
+          period_end?: string
+          period_start?: string
+          recommendations?: Json
+          risk_alerts?: Json
+          summary?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       bills: {
         Row: {
           account_id: string | null

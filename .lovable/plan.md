@@ -1,60 +1,54 @@
-# Fase 2 — Contas a pagar/receber funcionais
+## Status atual
 
-Substituir a página placeholder `/app/contas` por um módulo completo de contas com vencimentos, status, recorrências e geração automática de transação ao marcar como pago. Também integrar "próximas contas" no Dashboard.
+- **Fase 1** ✅ Auth, contas, categorias, transações, dashboard básico
+- **Fase 2** ✅ Contas a pagar/receber com recorrência
+- **Fase 3** ✅ Orçamentos por categoria e metas
 
-## Escopo
+## Fase 4 — Inteligência (próxima)
 
-1. **Página `/app/contas`** (`src/routes/app.contas.tsx`) — substituir placeholder.
-2. **Componente `BillFormDialog`** — criar/editar contas.
-3. **Helpers de recorrência** em `src/lib/bills.ts`.
-4. **Atualização do Dashboard** — card "Próximas contas (7 dias)".
+Foco em diferenciar o produto via IA e automação leve, conforme RF10–RF15 do documento de requisitos.
 
-## Funcionalidades
+### 4.1 Upload e processamento de PDFs (RF10–RF12)
 
-### Listagem
-- Tabs: **Todas | Pendentes | Pagas | Atrasadas**.
-- Filtros: tipo (despesa/receita), categoria, intervalo de vencimento.
-- Colunas: descrição, categoria, valor, vencimento, status, ações.
-- Badge de status colorido (pendente=amarelo, pago=verde, atrasado=vermelho, cancelado=cinza).
-- Marcação automática de "atrasado": contas `pending` com `due_date < hoje` são exibidas como atrasadas (visual no client; status real só muda ao agir).
+- Bucket de Storage `documents` (privado, RLS por `user_id`)
+- Tabelas `documents` e `document_extractions`
+- Página `/app/documentos`: upload, lista com status (`uploaded`/`processing`/`processed`/`failed`)
+- Edge function `extract-pdf-text`: baixa PDF do storage, extrai texto (pdf-parse) e salva
+- Edge function `suggest-transactions-from-pdf`: usa Lovable AI (`google/gemini-2.5-flash`) para sugerir transações estruturadas (descrição, valor, data, categoria)
+- UI de aprovação: usuário revisa cada sugestão antes de virar `transaction` (origem `pdf`)
 
-### Criar / Editar
-Dialog com campos: descrição, valor, tipo (income/expense), categoria (filtrada por tipo), conta, data de vencimento, recorrência (none/weekly/monthly/yearly).
+### 4.2 API de entrada simulada tipo WhatsApp (RF13)
 
-### Ações por linha
-- **Marcar como pago** → cria `transactions` row (mesma categoria/conta/valor/tipo, `date = hoje`, descrição com prefixo "Pagamento: "), atualiza bill: `status='paid'`, `paid_transaction_id=<id>`. Se houver recorrência ≠ none, cria automaticamente a próxima ocorrência (`status='pending'`, novo `due_date` calculado).
-- **Cancelar** → status='cancelled'.
-- **Reabrir** (se pago/cancelado) → volta para 'pending', se houver `paid_transaction_id` deleta a transação vinculada.
-- **Editar** / **Excluir**.
+- Edge function pública `simulate-whatsapp-entry` (sob `/api/public/` ou edge function direta)
+- Recebe `{ message, user_id }`, usa Lovable AI para extrair valor/categoria/tipo/data
+- Cria `transaction` com `source='whatsapp_simulado'`
+- Tela de teste em `/app/configuracoes` com input + curl de exemplo
 
-### Recorrência
-Helper `nextDueDate(date, recurrence)`:
-- weekly: +7 dias
-- monthly: +1 mês (mantém dia, ajusta fim de mês)
-- yearly: +1 ano
+### 4.3 Insights financeiros com IA (RF14–RF15)
 
-A próxima ocorrência só é gerada quando a conta atual é paga (modelo simples, evita explosão de registros futuros).
+- Tabela `ai_insights` (period_start, period_end, summary, recommendations, risk_alerts)
+- Edge function `generate-financial-insights`: agrega transações do mês (totais por categoria, evolução, top despesas) e envia agregados para Lovable AI
+- Página `/app/insights`: botão "Gerar insights do mês", histórico de análises anteriores
+- Card resumo no dashboard com último insight
 
-### Dashboard
-Adicionar Card "Próximas contas" listando até 5 bills com `status='pending'` e `due_date` entre hoje e hoje+7 dias, ordenadas por vencimento. Cada item linka para `/app/contas`.
+### 4.4 Ajustes de modelo
 
-## Detalhes técnicos
+Migration adicionando:
+- `transactions.source` (enum: `manual`/`pdf`/`whatsapp_simulado`/`ia`), default `manual`
+- `transactions.merchant`, `transactions.notes`, `transactions.document_id`
+- Tabelas `documents`, `document_extractions`, `ai_insights`, `ingestion_logs`
 
-- Usar `supabase` client direto (padrão já adotado nas outras páginas Fase 1).
-- Toda operação em uma função async com try/catch + `toast` (sonner).
-- Após mutation, refetch via `useQuery` invalidation OU re-busca local via `useState` + `useEffect` (manter consistência com `transacoes.tsx` — verificar padrão).
-- RLS já cobre tudo (`bills_all_own`, `transactions_all_own`); incluir `user_id: user.id` em todos os inserts.
-- Datas: usar `date-fns` (já em uso) com locale pt-BR.
-- Validação: bloquear amount ≤ 0 e campos obrigatórios via UI; sem schema lib nova.
+## Escopo recomendado para esta fase
 
-## Arquivos a criar/editar
+Sugiro dividir em **duas entregas** para manter previsibilidade:
 
-```text
-edit    src/routes/app.contas.tsx        # substitui placeholder
-create  src/components/app/BillFormDialog.tsx
-create  src/lib/bills.ts                 # nextDueDate + helpers
-edit    src/routes/app.index.tsx         # adiciona card "Próximas contas"
-```
+- **Fase 4a**: Insights com IA (4.3 + ajustes mínimos de modelo) — entrega rápida, alto valor percebido
+- **Fase 4b**: PDFs + WhatsApp simulado (4.1 + 4.2) — mais complexa, envolve storage e parsing
 
-## Fora de escopo (Fase 3)
-Orçamentos, metas, alertas de limite, lembretes por email, geração antecipada de várias ocorrências futuras.
+## Fora do escopo (Fase 5+)
+
+WhatsApp real, Open Finance, OCR de PDFs escaneados, importação CSV, app mobile, modo familiar, previsão de fluxo de caixa.
+
+## Pergunta
+
+Quer que eu comece pela **4a (Insights IA)** ou prefere ir direto para a **4b (PDFs + WhatsApp simulado)**? Ou seguir as duas juntas como Fase 4 completa?
