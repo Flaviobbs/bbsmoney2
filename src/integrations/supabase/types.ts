@@ -212,6 +212,83 @@ export type Database = {
         }
         Relationships: []
       }
+      document_extractions: {
+        Row: {
+          created_at: string
+          document_id: string
+          error_message: string | null
+          id: string
+          raw_text: string | null
+          status: string
+          suggestions: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          document_id: string
+          error_message?: string | null
+          id?: string
+          raw_text?: string | null
+          status?: string
+          suggestions?: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          document_id?: string
+          error_message?: string | null
+          id?: string
+          raw_text?: string | null
+          status?: string
+          suggestions?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_extractions_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          file_name: string
+          file_path: string
+          id: string
+          mime_type: string | null
+          processed_at: string | null
+          status: Database["public"]["Enums"]["document_status"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          file_name: string
+          file_path: string
+          id?: string
+          mime_type?: string | null
+          processed_at?: string | null
+          status?: Database["public"]["Enums"]["document_status"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          file_name?: string
+          file_path?: string
+          id?: string
+          mime_type?: string | null
+          processed_at?: string | null
+          status?: Database["public"]["Enums"]["document_status"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       goals: {
         Row: {
           created_at: string
@@ -238,6 +315,39 @@ export type Database = {
           id?: string
           name?: string
           target_amount?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ingestion_logs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          input_payload: Json | null
+          output_payload: Json | null
+          source: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          input_payload?: Json | null
+          output_payload?: Json | null
+          source: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          input_payload?: Json | null
+          output_payload?: Json | null
+          source?: string
+          status?: string
           user_id?: string
         }
         Relationships: []
@@ -271,7 +381,11 @@ export type Database = {
           created_at: string
           date: string
           description: string
+          document_id: string | null
           id: string
+          merchant: string | null
+          notes: string | null
+          source: Database["public"]["Enums"]["transaction_source"]
           type: Database["public"]["Enums"]["transaction_type"]
           user_id: string
         }
@@ -282,7 +396,11 @@ export type Database = {
           created_at?: string
           date?: string
           description?: string
+          document_id?: string | null
           id?: string
+          merchant?: string | null
+          notes?: string | null
+          source?: Database["public"]["Enums"]["transaction_source"]
           type: Database["public"]["Enums"]["transaction_type"]
           user_id: string
         }
@@ -293,7 +411,11 @@ export type Database = {
           created_at?: string
           date?: string
           description?: string
+          document_id?: string | null
           id?: string
+          merchant?: string | null
+          notes?: string | null
+          source?: Database["public"]["Enums"]["transaction_source"]
           type?: Database["public"]["Enums"]["transaction_type"]
           user_id?: string
         }
@@ -324,7 +446,9 @@ export type Database = {
     Enums: {
       account_type: "checking" | "savings" | "credit" | "cash" | "investment"
       bill_status: "pending" | "paid" | "overdue" | "cancelled"
+      document_status: "uploaded" | "processing" | "processed" | "failed"
       recurrence_type: "none" | "weekly" | "monthly" | "yearly"
+      transaction_source: "manual" | "pdf" | "whatsapp_simulado" | "ia"
       transaction_type: "income" | "expense"
     }
     CompositeTypes: {
@@ -455,7 +579,9 @@ export const Constants = {
     Enums: {
       account_type: ["checking", "savings", "credit", "cash", "investment"],
       bill_status: ["pending", "paid", "overdue", "cancelled"],
+      document_status: ["uploaded", "processing", "processed", "failed"],
       recurrence_type: ["none", "weekly", "monthly", "yearly"],
+      transaction_source: ["manual", "pdf", "whatsapp_simulado", "ia"],
       transaction_type: ["income", "expense"],
     },
   },

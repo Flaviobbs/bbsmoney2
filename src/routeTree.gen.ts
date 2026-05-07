@@ -18,10 +18,13 @@ import { Route as AppTransacoesRouteImport } from './routes/app.transacoes'
 import { Route as AppOrcamentosRouteImport } from './routes/app.orcamentos'
 import { Route as AppMetasRouteImport } from './routes/app.metas'
 import { Route as AppInsightsRouteImport } from './routes/app.insights'
+import { Route as AppDocumentosRouteImport } from './routes/app.documentos'
 import { Route as AppContasRouteImport } from './routes/app.contas'
 import { Route as AppConfiguracoesRouteImport } from './routes/app.configuracoes'
 import { Route as AppCategoriasRouteImport } from './routes/app.categorias'
+import { Route as ApiPublicWhatsappRouteImport } from './routes/api.public.whatsapp'
 import { Route as ApiInsightsGenerateRouteImport } from './routes/api.insights.generate'
+import { Route as ApiDocumentsProcessRouteImport } from './routes/api.documents.process'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -68,6 +71,11 @@ const AppInsightsRoute = AppInsightsRouteImport.update({
   path: '/insights',
   getParentRoute: () => AppRoute,
 } as any)
+const AppDocumentosRoute = AppDocumentosRouteImport.update({
+  id: '/documentos',
+  path: '/documentos',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppContasRoute = AppContasRouteImport.update({
   id: '/contas',
   path: '/contas',
@@ -83,9 +91,19 @@ const AppCategoriasRoute = AppCategoriasRouteImport.update({
   path: '/categorias',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiPublicWhatsappRoute = ApiPublicWhatsappRouteImport.update({
+  id: '/api/public/whatsapp',
+  path: '/api/public/whatsapp',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiInsightsGenerateRoute = ApiInsightsGenerateRouteImport.update({
   id: '/api/insights/generate',
   path: '/api/insights/generate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDocumentsProcessRoute = ApiDocumentsProcessRouteImport.update({
+  id: '/api/documents/process',
+  path: '/api/documents/process',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -97,12 +115,15 @@ export interface FileRoutesByFullPath {
   '/app/categorias': typeof AppCategoriasRoute
   '/app/configuracoes': typeof AppConfiguracoesRoute
   '/app/contas': typeof AppContasRoute
+  '/app/documentos': typeof AppDocumentosRoute
   '/app/insights': typeof AppInsightsRoute
   '/app/metas': typeof AppMetasRoute
   '/app/orcamentos': typeof AppOrcamentosRoute
   '/app/transacoes': typeof AppTransacoesRoute
   '/app/': typeof AppIndexRoute
+  '/api/documents/process': typeof ApiDocumentsProcessRoute
   '/api/insights/generate': typeof ApiInsightsGenerateRoute
+  '/api/public/whatsapp': typeof ApiPublicWhatsappRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -111,12 +132,15 @@ export interface FileRoutesByTo {
   '/app/categorias': typeof AppCategoriasRoute
   '/app/configuracoes': typeof AppConfiguracoesRoute
   '/app/contas': typeof AppContasRoute
+  '/app/documentos': typeof AppDocumentosRoute
   '/app/insights': typeof AppInsightsRoute
   '/app/metas': typeof AppMetasRoute
   '/app/orcamentos': typeof AppOrcamentosRoute
   '/app/transacoes': typeof AppTransacoesRoute
   '/app': typeof AppIndexRoute
+  '/api/documents/process': typeof ApiDocumentsProcessRoute
   '/api/insights/generate': typeof ApiInsightsGenerateRoute
+  '/api/public/whatsapp': typeof ApiPublicWhatsappRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -127,12 +151,15 @@ export interface FileRoutesById {
   '/app/categorias': typeof AppCategoriasRoute
   '/app/configuracoes': typeof AppConfiguracoesRoute
   '/app/contas': typeof AppContasRoute
+  '/app/documentos': typeof AppDocumentosRoute
   '/app/insights': typeof AppInsightsRoute
   '/app/metas': typeof AppMetasRoute
   '/app/orcamentos': typeof AppOrcamentosRoute
   '/app/transacoes': typeof AppTransacoesRoute
   '/app/': typeof AppIndexRoute
+  '/api/documents/process': typeof ApiDocumentsProcessRoute
   '/api/insights/generate': typeof ApiInsightsGenerateRoute
+  '/api/public/whatsapp': typeof ApiPublicWhatsappRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -144,12 +171,15 @@ export interface FileRouteTypes {
     | '/app/categorias'
     | '/app/configuracoes'
     | '/app/contas'
+    | '/app/documentos'
     | '/app/insights'
     | '/app/metas'
     | '/app/orcamentos'
     | '/app/transacoes'
     | '/app/'
+    | '/api/documents/process'
     | '/api/insights/generate'
+    | '/api/public/whatsapp'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -158,12 +188,15 @@ export interface FileRouteTypes {
     | '/app/categorias'
     | '/app/configuracoes'
     | '/app/contas'
+    | '/app/documentos'
     | '/app/insights'
     | '/app/metas'
     | '/app/orcamentos'
     | '/app/transacoes'
     | '/app'
+    | '/api/documents/process'
     | '/api/insights/generate'
+    | '/api/public/whatsapp'
   id:
     | '__root__'
     | '/'
@@ -173,12 +206,15 @@ export interface FileRouteTypes {
     | '/app/categorias'
     | '/app/configuracoes'
     | '/app/contas'
+    | '/app/documentos'
     | '/app/insights'
     | '/app/metas'
     | '/app/orcamentos'
     | '/app/transacoes'
     | '/app/'
+    | '/api/documents/process'
     | '/api/insights/generate'
+    | '/api/public/whatsapp'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -186,7 +222,9 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
+  ApiDocumentsProcessRoute: typeof ApiDocumentsProcessRoute
   ApiInsightsGenerateRoute: typeof ApiInsightsGenerateRoute
+  ApiPublicWhatsappRoute: typeof ApiPublicWhatsappRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -254,6 +292,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppInsightsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/documentos': {
+      id: '/app/documentos'
+      path: '/documentos'
+      fullPath: '/app/documentos'
+      preLoaderRoute: typeof AppDocumentosRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/contas': {
       id: '/app/contas'
       path: '/contas'
@@ -275,11 +320,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCategoriasRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/public/whatsapp': {
+      id: '/api/public/whatsapp'
+      path: '/api/public/whatsapp'
+      fullPath: '/api/public/whatsapp'
+      preLoaderRoute: typeof ApiPublicWhatsappRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/insights/generate': {
       id: '/api/insights/generate'
       path: '/api/insights/generate'
       fullPath: '/api/insights/generate'
       preLoaderRoute: typeof ApiInsightsGenerateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/documents/process': {
+      id: '/api/documents/process'
+      path: '/api/documents/process'
+      fullPath: '/api/documents/process'
+      preLoaderRoute: typeof ApiDocumentsProcessRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -289,6 +348,7 @@ interface AppRouteChildren {
   AppCategoriasRoute: typeof AppCategoriasRoute
   AppConfiguracoesRoute: typeof AppConfiguracoesRoute
   AppContasRoute: typeof AppContasRoute
+  AppDocumentosRoute: typeof AppDocumentosRoute
   AppInsightsRoute: typeof AppInsightsRoute
   AppMetasRoute: typeof AppMetasRoute
   AppOrcamentosRoute: typeof AppOrcamentosRoute
@@ -300,6 +360,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCategoriasRoute: AppCategoriasRoute,
   AppConfiguracoesRoute: AppConfiguracoesRoute,
   AppContasRoute: AppContasRoute,
+  AppDocumentosRoute: AppDocumentosRoute,
   AppInsightsRoute: AppInsightsRoute,
   AppMetasRoute: AppMetasRoute,
   AppOrcamentosRoute: AppOrcamentosRoute,
@@ -314,7 +375,9 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
+  ApiDocumentsProcessRoute: ApiDocumentsProcessRoute,
   ApiInsightsGenerateRoute: ApiInsightsGenerateRoute,
+  ApiPublicWhatsappRoute: ApiPublicWhatsappRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

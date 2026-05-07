@@ -7,6 +7,7 @@ import {
   Tags,
   Trophy,
   Sparkles,
+  FileText,
   Settings,
   LogOut,
   Wallet,
@@ -31,6 +32,7 @@ const items: { title: string; url: string; icon: typeof LayoutDashboard; exact?:
   { title: "Orçamentos", url: "/app/orcamentos", icon: Target },
   { title: "Metas", url: "/app/metas", icon: Trophy },
   { title: "Insights IA", url: "/app/insights", icon: Sparkles },
+  { title: "Documentos", url: "/app/documentos", icon: FileText },
   { title: "Categorias", url: "/app/categorias", icon: Tags },
   { title: "Configurações", url: "/app/configuracoes", icon: Settings },
 ];
