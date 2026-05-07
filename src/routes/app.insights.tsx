@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, AlertTriangle, Lightbulb, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { generateInsight } from "@/server/insights.functions";
 import { formatDate } from "@/lib/format";
 
 export const Route = createFileRoute("/app/insights")({
@@ -47,9 +46,12 @@ function InsightsPage() {
     if (!session) return;
     setGenerating(true);
     try {
-      await generateInsight({
-        headers: { authorization: `Bearer ${session.access_token}` },
-      } as never);
+      const res = await fetch("/api/insights/generate", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Erro ao gerar insight");
       toast.success("Insight gerado!");
       await load();
     } catch (e) {
