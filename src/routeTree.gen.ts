@@ -21,6 +21,7 @@ import { Route as AppInsightsRouteImport } from './routes/app.insights'
 import { Route as AppContasRouteImport } from './routes/app.contas'
 import { Route as AppConfiguracoesRouteImport } from './routes/app.configuracoes'
 import { Route as AppCategoriasRouteImport } from './routes/app.categorias'
+import { Route as ApiPublicWhatsappRouteImport } from './routes/api.public.whatsapp'
 import { Route as ApiInsightsGenerateRouteImport } from './routes/api.insights.generate'
 import { Route as ApiDocumentsProcessRouteImport } from './routes/api.documents.process'
 
@@ -84,6 +85,11 @@ const AppCategoriasRoute = AppCategoriasRouteImport.update({
   path: '/categorias',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiPublicWhatsappRoute = ApiPublicWhatsappRouteImport.update({
+  id: '/api/public/whatsapp',
+  path: '/api/public/whatsapp',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiInsightsGenerateRoute = ApiInsightsGenerateRouteImport.update({
   id: '/api/insights/generate',
   path: '/api/insights/generate',
@@ -110,6 +116,7 @@ export interface FileRoutesByFullPath {
   '/app/': typeof AppIndexRoute
   '/api/documents/process': typeof ApiDocumentsProcessRoute
   '/api/insights/generate': typeof ApiInsightsGenerateRoute
+  '/api/public/whatsapp': typeof ApiPublicWhatsappRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -125,6 +132,7 @@ export interface FileRoutesByTo {
   '/app': typeof AppIndexRoute
   '/api/documents/process': typeof ApiDocumentsProcessRoute
   '/api/insights/generate': typeof ApiInsightsGenerateRoute
+  '/api/public/whatsapp': typeof ApiPublicWhatsappRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -142,6 +150,7 @@ export interface FileRoutesById {
   '/app/': typeof AppIndexRoute
   '/api/documents/process': typeof ApiDocumentsProcessRoute
   '/api/insights/generate': typeof ApiInsightsGenerateRoute
+  '/api/public/whatsapp': typeof ApiPublicWhatsappRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -160,6 +169,7 @@ export interface FileRouteTypes {
     | '/app/'
     | '/api/documents/process'
     | '/api/insights/generate'
+    | '/api/public/whatsapp'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -175,6 +185,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/api/documents/process'
     | '/api/insights/generate'
+    | '/api/public/whatsapp'
   id:
     | '__root__'
     | '/'
@@ -191,6 +202,7 @@ export interface FileRouteTypes {
     | '/app/'
     | '/api/documents/process'
     | '/api/insights/generate'
+    | '/api/public/whatsapp'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -200,6 +212,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   ApiDocumentsProcessRoute: typeof ApiDocumentsProcessRoute
   ApiInsightsGenerateRoute: typeof ApiInsightsGenerateRoute
+  ApiPublicWhatsappRoute: typeof ApiPublicWhatsappRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -288,6 +301,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCategoriasRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/public/whatsapp': {
+      id: '/api/public/whatsapp'
+      path: '/api/public/whatsapp'
+      fullPath: '/api/public/whatsapp'
+      preLoaderRoute: typeof ApiPublicWhatsappRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/insights/generate': {
       id: '/api/insights/generate'
       path: '/api/insights/generate'
@@ -336,6 +356,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   ApiDocumentsProcessRoute: ApiDocumentsProcessRoute,
   ApiInsightsGenerateRoute: ApiInsightsGenerateRoute,
+  ApiPublicWhatsappRoute: ApiPublicWhatsappRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
