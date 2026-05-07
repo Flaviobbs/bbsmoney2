@@ -18,6 +18,7 @@ import { Route as AppTransacoesRouteImport } from './routes/app.transacoes'
 import { Route as AppOrcamentosRouteImport } from './routes/app.orcamentos'
 import { Route as AppMetasRouteImport } from './routes/app.metas'
 import { Route as AppInsightsRouteImport } from './routes/app.insights'
+import { Route as AppDocumentosRouteImport } from './routes/app.documentos'
 import { Route as AppContasRouteImport } from './routes/app.contas'
 import { Route as AppConfiguracoesRouteImport } from './routes/app.configuracoes'
 import { Route as AppCategoriasRouteImport } from './routes/app.categorias'
@@ -70,6 +71,11 @@ const AppInsightsRoute = AppInsightsRouteImport.update({
   path: '/insights',
   getParentRoute: () => AppRoute,
 } as any)
+const AppDocumentosRoute = AppDocumentosRouteImport.update({
+  id: '/documentos',
+  path: '/documentos',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppContasRoute = AppContasRouteImport.update({
   id: '/contas',
   path: '/contas',
@@ -109,6 +115,7 @@ export interface FileRoutesByFullPath {
   '/app/categorias': typeof AppCategoriasRoute
   '/app/configuracoes': typeof AppConfiguracoesRoute
   '/app/contas': typeof AppContasRoute
+  '/app/documentos': typeof AppDocumentosRoute
   '/app/insights': typeof AppInsightsRoute
   '/app/metas': typeof AppMetasRoute
   '/app/orcamentos': typeof AppOrcamentosRoute
@@ -125,6 +132,7 @@ export interface FileRoutesByTo {
   '/app/categorias': typeof AppCategoriasRoute
   '/app/configuracoes': typeof AppConfiguracoesRoute
   '/app/contas': typeof AppContasRoute
+  '/app/documentos': typeof AppDocumentosRoute
   '/app/insights': typeof AppInsightsRoute
   '/app/metas': typeof AppMetasRoute
   '/app/orcamentos': typeof AppOrcamentosRoute
@@ -143,6 +151,7 @@ export interface FileRoutesById {
   '/app/categorias': typeof AppCategoriasRoute
   '/app/configuracoes': typeof AppConfiguracoesRoute
   '/app/contas': typeof AppContasRoute
+  '/app/documentos': typeof AppDocumentosRoute
   '/app/insights': typeof AppInsightsRoute
   '/app/metas': typeof AppMetasRoute
   '/app/orcamentos': typeof AppOrcamentosRoute
@@ -162,6 +171,7 @@ export interface FileRouteTypes {
     | '/app/categorias'
     | '/app/configuracoes'
     | '/app/contas'
+    | '/app/documentos'
     | '/app/insights'
     | '/app/metas'
     | '/app/orcamentos'
@@ -178,6 +188,7 @@ export interface FileRouteTypes {
     | '/app/categorias'
     | '/app/configuracoes'
     | '/app/contas'
+    | '/app/documentos'
     | '/app/insights'
     | '/app/metas'
     | '/app/orcamentos'
@@ -195,6 +206,7 @@ export interface FileRouteTypes {
     | '/app/categorias'
     | '/app/configuracoes'
     | '/app/contas'
+    | '/app/documentos'
     | '/app/insights'
     | '/app/metas'
     | '/app/orcamentos'
@@ -280,6 +292,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppInsightsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/documentos': {
+      id: '/app/documentos'
+      path: '/documentos'
+      fullPath: '/app/documentos'
+      preLoaderRoute: typeof AppDocumentosRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/contas': {
       id: '/app/contas'
       path: '/contas'
@@ -329,6 +348,7 @@ interface AppRouteChildren {
   AppCategoriasRoute: typeof AppCategoriasRoute
   AppConfiguracoesRoute: typeof AppConfiguracoesRoute
   AppContasRoute: typeof AppContasRoute
+  AppDocumentosRoute: typeof AppDocumentosRoute
   AppInsightsRoute: typeof AppInsightsRoute
   AppMetasRoute: typeof AppMetasRoute
   AppOrcamentosRoute: typeof AppOrcamentosRoute
@@ -340,6 +360,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCategoriasRoute: AppCategoriasRoute,
   AppConfiguracoesRoute: AppConfiguracoesRoute,
   AppContasRoute: AppContasRoute,
+  AppDocumentosRoute: AppDocumentosRoute,
   AppInsightsRoute: AppInsightsRoute,
   AppMetasRoute: AppMetasRoute,
   AppOrcamentosRoute: AppOrcamentosRoute,
@@ -361,3 +382,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
