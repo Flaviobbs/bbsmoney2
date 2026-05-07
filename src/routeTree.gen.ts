@@ -21,6 +21,7 @@ import { Route as AppInsightsRouteImport } from './routes/app.insights'
 import { Route as AppContasRouteImport } from './routes/app.contas'
 import { Route as AppConfiguracoesRouteImport } from './routes/app.configuracoes'
 import { Route as AppCategoriasRouteImport } from './routes/app.categorias'
+import { Route as ApiInsightsGenerateRouteImport } from './routes/api.insights.generate'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -82,6 +83,11 @@ const AppCategoriasRoute = AppCategoriasRouteImport.update({
   path: '/categorias',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiInsightsGenerateRoute = ApiInsightsGenerateRouteImport.update({
+  id: '/api/insights/generate',
+  path: '/api/insights/generate',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -96,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/app/orcamentos': typeof AppOrcamentosRoute
   '/app/transacoes': typeof AppTransacoesRoute
   '/app/': typeof AppIndexRoute
+  '/api/insights/generate': typeof ApiInsightsGenerateRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -109,6 +116,7 @@ export interface FileRoutesByTo {
   '/app/orcamentos': typeof AppOrcamentosRoute
   '/app/transacoes': typeof AppTransacoesRoute
   '/app': typeof AppIndexRoute
+  '/api/insights/generate': typeof ApiInsightsGenerateRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -124,6 +132,7 @@ export interface FileRoutesById {
   '/app/orcamentos': typeof AppOrcamentosRoute
   '/app/transacoes': typeof AppTransacoesRoute
   '/app/': typeof AppIndexRoute
+  '/api/insights/generate': typeof ApiInsightsGenerateRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -140,6 +149,7 @@ export interface FileRouteTypes {
     | '/app/orcamentos'
     | '/app/transacoes'
     | '/app/'
+    | '/api/insights/generate'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -153,6 +163,7 @@ export interface FileRouteTypes {
     | '/app/orcamentos'
     | '/app/transacoes'
     | '/app'
+    | '/api/insights/generate'
   id:
     | '__root__'
     | '/'
@@ -167,6 +178,7 @@ export interface FileRouteTypes {
     | '/app/orcamentos'
     | '/app/transacoes'
     | '/app/'
+    | '/api/insights/generate'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -174,6 +186,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
+  ApiInsightsGenerateRoute: typeof ApiInsightsGenerateRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -262,6 +275,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCategoriasRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/insights/generate': {
+      id: '/api/insights/generate'
+      path: '/api/insights/generate'
+      fullPath: '/api/insights/generate'
+      preLoaderRoute: typeof ApiInsightsGenerateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -294,7 +314,17 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
+  ApiInsightsGenerateRoute: ApiInsightsGenerateRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
