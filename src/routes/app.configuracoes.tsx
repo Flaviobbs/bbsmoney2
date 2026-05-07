@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/app/configuracoes")({
@@ -16,6 +17,9 @@ function SettingsPage() {
   const { user, signOut } = useAuth();
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [waMsg, setWaMsg] = useState("Gastei 50 reais no mercado hoje");
+  const [waLoading, setWaLoading] = useState(false);
+  const [waResult, setWaResult] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -38,6 +42,31 @@ function SettingsPage() {
     if (error) return toast.error(error.message);
     toast.success("Perfil atualizado");
   };
+
+  const sendWhats = async () => {
+    if (!user) return;
+    setWaLoading(true);
+    setWaResult(null);
+    try {
+      const res = await fetch("/api/public/whatsapp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: waMsg, user_id: user.id }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erro");
+      setWaResult(JSON.stringify(json.parsed, null, 2));
+      toast.success("Transação criada via WhatsApp simulado");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro");
+    } finally {
+      setWaLoading(false);
+    }
+  };
+
+  const curlExample = user
+    ? `curl -X POST ${typeof window !== "undefined" ? window.location.origin : ""}/api/public/whatsapp \\\n  -H "Content-Type: application/json" \\\n  -d '{"message":"Gastei 50 reais no mercado","user_id":"${user.id}"}'`
+    : "";
 
   return (
     <div className="space-y-6">
@@ -65,6 +94,34 @@ function SettingsPage() {
             <Button variant="outline" onClick={signOut}>
               Sair
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="max-w-2xl">
+        <CardHeader>
+          <CardTitle className="text-base">WhatsApp simulado</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Envie uma mensagem em linguagem natural. A IA extrai valor, categoria, tipo e data,
+            e cria uma transação na sua conta.
+          </p>
+          <Textarea
+            value={waMsg}
+            onChange={(e) => setWaMsg(e.target.value)}
+            rows={3}
+            placeholder="Ex.: Recebi 1500 de freela ontem"
+          />
+          <Button onClick={sendWhats} disabled={waLoading || !waMsg.trim()}>
+            {waLoading ? "Enviando..." : "Enviar"}
+          </Button>
+          {waResult && (
+            <pre className="overflow-auto rounded-md bg-muted p-3 text-xs">{waResult}</pre>
+          )}
+          <div className="space-y-2">
+            <Label className="text-xs">Endpoint público (curl)</Label>
+            <pre className="overflow-auto rounded-md bg-muted p-3 text-xs">{curlExample}</pre>
           </div>
         </CardContent>
       </Card>
