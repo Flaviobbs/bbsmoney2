@@ -48,10 +48,16 @@ function SettingsPage() {
     setWaLoading(true);
     setWaResult(null);
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("Sessão expirada");
       const res = await fetch("/api/public/whatsapp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: waMsg, user_id: user.id }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ message: waMsg }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Erro");
@@ -65,7 +71,7 @@ function SettingsPage() {
   };
 
   const curlExample = user
-    ? `curl -X POST ${typeof window !== "undefined" ? window.location.origin : ""}/api/public/whatsapp \\\n  -H "Content-Type: application/json" \\\n  -d '{"message":"Gastei 50 reais no mercado","user_id":"${user.id}"}'`
+    ? `curl -X POST ${typeof window !== "undefined" ? window.location.origin : ""}/api/public/whatsapp \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer <SEU_ACCESS_TOKEN>" \\\n  -d '{"message":"Gastei 50 reais no mercado"}'`
     : "";
 
   return (
