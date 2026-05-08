@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/api/public/whatsapp")({
   server: {
@@ -19,31 +21,38 @@ export const Route = createFileRoute("/api/public/whatsapp")({
           "Content-Type": "application/json",
         };
         const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
-        if (!LOVABLE_API_KEY)
+        const SUPABASE_URL = process.env.SUPABASE_URL;
+        const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
+        if (!LOVABLE_API_KEY || !SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY)
           return new Response(JSON.stringify({ error: "Server misconfigured" }), { status: 500, headers: cors });
 
-        let body: { message?: string; user_id?: string };
+        const authHeader = request.headers.get("authorization");
+        if (!authHeader?.startsWith("Bearer ")) {
+          return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: cors });
+        }
+        const token = authHeader.slice(7);
+        const userClient = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+          global: { headers: { Authorization: `Bearer ${token}` } },
+          auth: { persistSession: false, autoRefreshToken: false },
+        });
+        const { data: claimsData, error: claimsErr } = await userClient.auth.getClaims(token);
+        if (claimsErr || !claimsData?.claims?.sub) {
+          return new Response(JSON.stringify({ error: "Invalid token" }), { status: 401, headers: cors });
+        }
+        const userId = claimsData.claims.sub;
+
+        let body: { message?: string };
         try {
           body = await request.json();
         } catch {
           return new Response(JSON.stringify({ error: "JSON inválido" }), { status: 400, headers: cors });
         }
         const message = (body.message ?? "").trim();
-        const userId = body.user_id;
-        if (!message || !userId)
+        if (!message || message.length > 2000)
           return new Response(
-            JSON.stringify({ error: "message e user_id obrigatórios" }),
+            JSON.stringify({ error: "message obrigatório (máx. 2000 caracteres)" }),
             { status: 400, headers: cors },
           );
-
-        // Verifica que o user existe
-        const { data: prof } = await supabaseAdmin
-          .from("profiles")
-          .select("id")
-          .eq("id", userId)
-          .maybeSingle();
-        if (!prof)
-          return new Response(JSON.stringify({ error: "Usuário não encontrado" }), { status: 404, headers: cors });
 
         const { data: cats } = await supabaseAdmin
           .from("categories")
