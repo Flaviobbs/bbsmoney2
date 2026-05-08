@@ -71,7 +71,13 @@ function DocumentosPage() {
   const onUpload = async (file: File) => {
     if (!user) return;
     setUploading(true);
-    const path = `${user.id}/${crypto.randomUUID()}-${file.name}`;
+    const safeName = file.name
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9._-]+/g, "_")
+      .replace(/_+/g, "_")
+      .toLowerCase();
+    const path = `${user.id}/${crypto.randomUUID()}-${safeName}`;
     const { error: upErr } = await supabase.storage.from("documents").upload(path, file, {
       contentType: file.type || "application/pdf",
     });
