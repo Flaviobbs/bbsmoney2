@@ -35,9 +35,13 @@ export const Route = createRootRoute({
       { name: "description", content: "Organize suas finanças pessoais com o BBSMoney: receitas, despesas, contas a pagar, orçamentos e metas em um só lugar." },
       { name: "author", content: "BBSMoney" },
       { property: "og:title", content: "BBSMoney — Controle financeiro pessoal" },
-      { property: "og:description", content: "Organize suas finanças pessoais com o BBSMoney." },
+      { property: "og:description", content: "Organize suas finanças pessoais com o BBSMoney: receitas, despesas, contas a pagar, orçamentos e metas em um só lugar." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
+      { name: "twitter:title", content: "BBSMoney — Controle financeiro pessoal" },
+      { name: "twitter:description", content: "Organize suas finanças pessoais com o BBSMoney: receitas, despesas, contas a pagar, orçamentos e metas em um só lugar." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e5b2a848-ff6a-4787-91bf-9e1eac840f20/id-preview-b777ef2b--096d7a53-a06d-41b2-8058-c61e711d7c7d.lovable.app-1778186507948.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e5b2a848-ff6a-4787-91bf-9e1eac840f20/id-preview-b777ef2b--096d7a53-a06d-41b2-8058-c61e711d7c7d.lovable.app-1778186507948.png" },
     ],
     links: [
       {
