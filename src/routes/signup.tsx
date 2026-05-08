@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Wallet } from "lucide-react";
 import { toast } from "sonner";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 
 export const Route = createFileRoute("/signup")({
   component: SignupPage,
@@ -70,6 +71,12 @@ function SignupPage() {
             {loading ? "Criando..." : "Criar conta"}
           </Button>
         </form>
+        <div className="my-4 flex items-center gap-3">
+          <div className="h-px flex-1 bg-border" />
+          <span className="text-xs text-muted-foreground">ou</span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+        <GoogleSignInButton label="Cadastrar com Google" />
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Já tem conta?{" "}
           <Link to="/login" className="text-primary hover:underline">Entrar</Link>
