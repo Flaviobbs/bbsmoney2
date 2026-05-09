@@ -326,6 +326,7 @@ function EditCategoryDialog({
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState(COLORS[0]);
   const [saving, setSaving] = useState(false);
+  const [applyAll, setApplyAll] = useState(true);
 
   useEffect(() => {
     if (tx) {
@@ -333,6 +334,7 @@ function EditCategoryDialog({
       setCreating(false);
       setNewName("");
       setNewColor(COLORS[0]);
+      setApplyAll(true);
     }
   }, [tx]);
 
@@ -365,13 +367,23 @@ function EditCategoryDialog({
       }
       finalCategoryId = data.id;
     }
-    const { error } = await supabase
+    const desc = (tx.description ?? "").trim();
+    let query = supabase
       .from("transactions")
-      .update({ category_id: finalCategoryId || null })
-      .eq("id", tx.id);
+      .update({ category_id: finalCategoryId || null });
+    if (applyAll && desc) {
+      query = query.eq("type", tx.type).ilike("description", desc);
+    } else {
+      query = query.eq("id", tx.id);
+    }
+    const { error, count } = await query.select("id", { count: "exact" });
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success("Categoria atualizada");
+    toast.success(
+      applyAll && desc
+        ? `Categoria atualizada em ${count ?? 0} transaç${(count ?? 0) === 1 ? "ão" : "ões"}`
+        : "Categoria atualizada",
+    );
     onSaved();
   };
 
@@ -441,6 +453,23 @@ function EditCategoryDialog({
                 Cancelar nova categoria
               </Button>
             </div>
+          )}
+
+          {tx.description?.trim() && (
+            <label className="flex items-start gap-2 rounded-md border bg-muted/20 p-3 text-sm cursor-pointer">
+              <Checkbox
+                checked={applyAll}
+                onCheckedChange={(v) => setApplyAll(!!v)}
+                className="mt-0.5"
+              />
+              <span>
+                Aplicar a todas as transações com a descrição{" "}
+                <span className="font-medium">"{tx.description.trim()}"</span>{" "}
+                <span className="text-muted-foreground">
+                  (anteriores e futuras do mesmo tipo)
+                </span>
+              </span>
+            </label>
           )}
         </div>
         <DialogFooter>
