@@ -483,17 +483,33 @@ function DocumentosPage() {
                         </div>
                       </div>
                     )}
-                    {ex.suggestions.map((s, i) => (
+                    {ex.suggestions.map((s, i) => {
+                      const isDup = (dupKeys[d.id] ?? new Set()).has(
+                        dupKey(s.data, Number(s.valor), s.descricao),
+                      );
+                      return (
                       <div
                         key={i}
-                        className="flex flex-wrap items-center gap-3 rounded-md border p-2"
+                        className={`flex flex-wrap items-center gap-3 rounded-md border p-2 ${
+                          isDup ? "border-amber-500/40 bg-amber-500/5" : ""
+                        }`}
                       >
                         <Checkbox
                           checked={selected[d.id]?.has(i) ?? false}
                           onCheckedChange={() => toggleSelect(d.id, i)}
                         />
                         <div className="flex-1 min-w-0">
-                          <div className="truncate text-sm font-medium">{s.descricao}</div>
+                          <div className="flex items-center gap-2">
+                            <span className="truncate text-sm font-medium">{s.descricao}</span>
+                            {isDup && (
+                              <Badge
+                                variant="outline"
+                                className="border-amber-500/60 text-amber-700 dark:text-amber-400"
+                              >
+                                Já cadastrada
+                              </Badge>
+                            )}
+                          </div>
                           <div className="text-xs text-muted-foreground">
                             {s.data} · {s.categoria} · {s.tipo === "income" ? "Receita" : "Despesa"}
                           </div>
@@ -516,7 +532,8 @@ function DocumentosPage() {
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
