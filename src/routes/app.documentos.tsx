@@ -6,6 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Loader2, Upload, FileText, Trash2, Check, X } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
@@ -46,6 +56,14 @@ function DocumentosPage() {
   const [uploading, setUploading] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [openDocId, setOpenDocId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Record<string, Set<number>>>({});
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [pwdPrompt, setPwdPrompt] = useState<{
+    docId: string;
+    incorrect: boolean;
+    value: string;
+    save: boolean;
+  } | null>(null);
 
   const load = async () => {
     if (!user) return;
@@ -98,7 +116,7 @@ function DocumentosPage() {
     void load();
   };
 
-  const processDoc = async (docId: string) => {
+  const processDoc = async (docId: string, password?: string) => {
     if (!session) return;
     setProcessingId(docId);
     try {
@@ -108,10 +126,22 @@ function DocumentosPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ document_id: docId }),
+        body: JSON.stringify({ document_id: docId, password }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Erro");
+      if (!res.ok) {
+        if (json?.requires_password) {
+          setPwdPrompt({
+            docId,
+            incorrect: !!json.incorrect_password,
+            value: "",
+            save: false,
+          });
+          await load();
+          return;
+        }
+        throw new Error(json.error ?? "Erro");
+      }
       toast.success(`${json.suggestions?.length ?? 0} sugestões geradas`);
       setOpenDocId(docId);
       await load();
@@ -121,6 +151,17 @@ function DocumentosPage() {
     } finally {
       setProcessingId(null);
     }
+  };
+
+  const submitPassword = async () => {
+    if (!pwdPrompt || !user) return;
+    const { docId, value, save } = pwdPrompt;
+    if (!value) return toast.error("Informe a senha");
+    if (save) {
+      await supabase.from("profiles").update({ pdf_password: value }).eq("id", user.id);
+    }
+    setPwdPrompt(null);
+    await processDoc(docId, value);
   };
 
   const removeDoc = async (doc: Doc) => {
@@ -154,6 +195,82 @@ function DocumentosPage() {
     if (error) return toast.error(error.message);
     toast.success("Transação criada");
     rejectSuggestion(docId, idx);
+  };
+
+  const toggleSelect = (docId: string, idx: number) => {
+    setSelected((prev) => {
+      const set = new Set(prev[docId] ?? []);
+      if (set.has(idx)) set.delete(idx);
+      else set.add(idx);
+      return { ...prev, [docId]: set };
+    });
+  };
+
+  const toggleSelectAll = (docId: string, total: number) => {
+    setSelected((prev) => {
+      const set = prev[docId] ?? new Set<number>();
+      if (set.size === total) return { ...prev, [docId]: new Set() };
+      return { ...prev, [docId]: new Set(Array.from({ length: total }, (_, i) => i)) };
+    });
+  };
+
+  const bulkApprove = async (docId: string) => {
+    if (!user) return;
+    const ex = extractions[docId];
+    const set = selected[docId];
+    if (!ex || !set || set.size === 0) return;
+    setBulkBusy(true);
+    try {
+      const sugs = Array.from(set).map((i) => ({ idx: i, s: ex.suggestions[i] })).filter((x) => x.s);
+      const { data: cats } = await supabase.from("categories").select("id,name,type");
+      const { data: accounts } = await supabase.from("accounts").select("id").limit(1);
+      const accountId = accounts?.[0]?.id ?? null;
+      const rows = sugs.map(({ s }) => {
+        const cat = cats?.find(
+          (c) => c.type === s.tipo && c.name.toLowerCase() === s.categoria.toLowerCase(),
+        );
+        return {
+          user_id: user.id,
+          description: s.descricao,
+          amount: s.valor,
+          type: s.tipo,
+          date: s.data,
+          category_id: cat?.id ?? null,
+          account_id: accountId,
+          source: "pdf" as const,
+          document_id: docId,
+          merchant: s.comerciante ?? null,
+        };
+      });
+      const { error } = await supabase.from("transactions").insert(rows);
+      if (error) throw error;
+      const remaining = ex.suggestions.filter((_, i) => !set.has(i));
+      await supabase
+        .from("document_extractions")
+        .update({ suggestions: remaining })
+        .eq("id", ex.id);
+      setExtractions((prev) => ({ ...prev, [docId]: { ...ex, suggestions: remaining } }));
+      setSelected((prev) => ({ ...prev, [docId]: new Set() }));
+      toast.success(`${rows.length} transações criadas`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro");
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const bulkReject = async (docId: string) => {
+    const ex = extractions[docId];
+    const set = selected[docId];
+    if (!ex || !set || set.size === 0) return;
+    const remaining = ex.suggestions.filter((_, i) => !set.has(i));
+    await supabase
+      .from("document_extractions")
+      .update({ suggestions: remaining })
+      .eq("id", ex.id);
+    setExtractions((prev) => ({ ...prev, [docId]: { ...ex, suggestions: remaining } }));
+    setSelected((prev) => ({ ...prev, [docId]: new Set() }));
+    toast.success("Sugestões removidas");
   };
 
   const rejectSuggestion = (docId: string, idx: number) => {
@@ -263,11 +380,46 @@ function DocumentosPage() {
                     {ex.suggestions.length === 0 && (
                       <div className="text-sm text-muted-foreground">Sem sugestões.</div>
                     )}
+                    {ex.suggestions.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2 pb-1">
+                        <Checkbox
+                          checked={
+                            (selected[d.id]?.size ?? 0) === ex.suggestions.length &&
+                            ex.suggestions.length > 0
+                          }
+                          onCheckedChange={() => toggleSelectAll(d.id, ex.suggestions.length)}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          {selected[d.id]?.size ?? 0} de {ex.suggestions.length} selecionadas
+                        </span>
+                        <div className="ml-auto flex gap-2">
+                          <Button
+                            size="sm"
+                            disabled={bulkBusy || !(selected[d.id]?.size)}
+                            onClick={() => bulkApprove(d.id)}
+                          >
+                            <Check className="h-4 w-4" /> Aprovar selecionadas
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={bulkBusy || !(selected[d.id]?.size)}
+                            onClick={() => bulkReject(d.id)}
+                          >
+                            <X className="h-4 w-4" /> Rejeitar selecionadas
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                     {ex.suggestions.map((s, i) => (
                       <div
                         key={i}
                         className="flex flex-wrap items-center gap-3 rounded-md border p-2"
                       >
+                        <Checkbox
+                          checked={selected[d.id]?.has(i) ?? false}
+                          onCheckedChange={() => toggleSelect(d.id, i)}
+                        />
                         <div className="flex-1 min-w-0">
                           <div className="truncate text-sm font-medium">{s.descricao}</div>
                           <div className="text-xs text-muted-foreground">
@@ -300,6 +452,50 @@ function DocumentosPage() {
           );
         })}
       </div>
+
+      <Dialog open={!!pwdPrompt} onOpenChange={(o) => !o && setPwdPrompt(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>PDF protegido por senha</DialogTitle>
+            <DialogDescription>
+              {pwdPrompt?.incorrect
+                ? "A senha informada está incorreta. Tente novamente."
+                : "Este PDF requer senha para ser aberto. Informe a senha para continuar."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label>Senha do PDF</Label>
+              <Input
+                type="password"
+                autoFocus
+                value={pwdPrompt?.value ?? ""}
+                onChange={(e) =>
+                  setPwdPrompt((p) => (p ? { ...p, value: e.target.value } : p))
+                }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void submitPassword();
+                }}
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={pwdPrompt?.save ?? false}
+                onCheckedChange={(c) =>
+                  setPwdPrompt((p) => (p ? { ...p, save: c === true } : p))
+                }
+              />
+              Salvar como senha padrão para próximos PDFs
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPwdPrompt(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={submitPassword}>Processar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -27,8 +27,15 @@ export const Route = createFileRoute("/api/documents/process")({
         }
         const userId = claims.claims.sub;
 
-        const body = (await request.json()) as { document_id?: string };
+        const body = (await request.json()) as { document_id?: string; password?: string };
         if (!body.document_id) return Response.json({ error: "document_id obrigatório" }, { status: 400 });
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("pdf_password")
+          .eq("id", userId)
+          .maybeSingle();
+        const password = body.password ?? profile?.pdf_password ?? undefined;
 
         const { data: doc, error: docErr } = await supabase
           .from("documents")
@@ -47,7 +54,29 @@ export const Route = createFileRoute("/api/documents/process")({
 
           const buf = new Uint8Array(await file.arrayBuffer());
           const { extractText, getDocumentProxy } = await import("unpdf");
-          const pdf = await getDocumentProxy(buf);
+          let pdf;
+          try {
+            pdf = await getDocumentProxy(buf, password ? { password } : {});
+          } catch (pdfErr) {
+            const name = (pdfErr as { name?: string })?.name;
+            const code = (pdfErr as { code?: number })?.code;
+            if (name === "PasswordException") {
+              const incorrect = code === 2;
+              await supabase
+                .from("documents")
+                .update({ status: "uploaded", error_message: incorrect ? "Senha incorreta" : "PDF protegido por senha" })
+                .eq("id", doc.id);
+              return Response.json(
+                {
+                  error: incorrect ? "Senha incorreta para este PDF" : "Este PDF requer senha",
+                  requires_password: true,
+                  incorrect_password: incorrect,
+                },
+                { status: 400 },
+              );
+            }
+            throw pdfErr;
+          }
           const { text } = await extractText(pdf, { mergePages: true });
           const rawText = (Array.isArray(text) ? text.join("\n") : text).slice(0, 20000);
 
