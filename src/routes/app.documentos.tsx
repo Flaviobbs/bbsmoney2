@@ -542,6 +542,91 @@ function DocumentosPage() {
         })}
       </div>
 
+      <Dialog open={!!confirmDup} onOpenChange={(o) => !o && setConfirmDup(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {confirmDup?.bulk
+                ? `${confirmDup?.duplicates.length} possível(eis) duplicata(s)`
+                : "Transação possivelmente duplicada"}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmDup?.bulk
+                ? "Algumas das sugestões selecionadas já existem em Transações com a mesma data, valor e descrição."
+                : "Já existe uma transação idêntica (mesma data, valor e descrição). Deseja cadastrar mesmo assim?"}
+            </DialogDescription>
+          </DialogHeader>
+          {confirmDup?.bulk && (
+            <div className="max-h-56 space-y-1 overflow-auto rounded-md border p-2 text-sm">
+              {confirmDup.duplicates.map((i) => {
+                const s = extractions[confirmDup.docId]?.suggestions[i];
+                if (!s) return null;
+                return (
+                  <div key={i} className="flex items-center justify-between gap-2">
+                    <span className="truncate">
+                      {s.data} · {s.descricao}
+                    </span>
+                    <span className="tabular-nums font-medium">
+                      {formatCurrency(Number(s.valor))}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmDup(null)}>
+              Cancelar
+            </Button>
+            {confirmDup?.bulk ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    if (!confirmDup) return;
+                    const dupSet = new Set(confirmDup.duplicates);
+                    const keep = confirmDup.indices.filter((i) => !dupSet.has(i));
+                    const docId = confirmDup.docId;
+                    setConfirmDup(null);
+                    if (keep.length === 0) {
+                      toast.info("Nada a cadastrar");
+                      return;
+                    }
+                    await runBulkInsert(docId, keep);
+                  }}
+                >
+                  Pular duplicadas
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (!confirmDup) return;
+                    const all = confirmDup.indices;
+                    const docId = confirmDup.docId;
+                    setConfirmDup(null);
+                    await runBulkInsert(docId, all);
+                  }}
+                >
+                  Cadastrar tudo
+                </Button>
+              </>
+            ) : (
+              <Button
+                onClick={async () => {
+                  if (!confirmDup) return;
+                  const i = confirmDup.indices[0];
+                  const s = extractions[confirmDup.docId]?.suggestions[i];
+                  const docId = confirmDup.docId;
+                  setConfirmDup(null);
+                  if (s) await insertOne(docId, s, i);
+                }}
+              >
+                Cadastrar duplicada
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!pwdPrompt} onOpenChange={(o) => !o && setPwdPrompt(null)}>
         <DialogContent>
           <DialogHeader>
