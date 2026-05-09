@@ -26,6 +26,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Trash2, Search, ChevronDown } from "lucide-react";
 import { formatCurrency, todayISO } from "@/lib/format";
 import { toast } from "sonner";
