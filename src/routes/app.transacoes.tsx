@@ -214,13 +214,9 @@ function TransactionsPage() {
           <SelectContent>
             <SelectItem value="all">Todas as categorias</SelectItem>
             <SelectItem value="__none__">Sem categoria</SelectItem>
-            {cats
-              .filter((c) => filterType === "all" || c.type === filterType)
-              .reduce<{ cat: Cat; depth: number }[]>((acc, _c, _i, arr) => {
-                if (acc.length) return acc;
-                return buildCatTree(arr);
-              }, [])
-              .map(({ cat: c, depth }) => (
+            {buildCatTree(
+              cats.filter((c) => filterType === "all" || c.type === filterType),
+            ).map(({ cat: c, depth }) => (
                 <SelectItem key={c.id} value={c.id}>
                   <span className="inline-flex items-center gap-2">
                     {depth > 0 && <span className="text-muted-foreground">↳</span>}
