@@ -58,6 +58,13 @@ function DocumentosPage() {
   const [openDocId, setOpenDocId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Record<string, Set<number>>>({});
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [dupKeys, setDupKeys] = useState<Record<string, Set<string>>>({});
+  const [confirmDup, setConfirmDup] = useState<{
+    docId: string;
+    indices: number[];
+    duplicates: number[];
+    bulk: boolean;
+  } | null>(null);
   const [pwdPrompt, setPwdPrompt] = useState<{
     docId: string;
     incorrect: boolean;
@@ -81,6 +88,43 @@ function DocumentosPage() {
     });
     setExtractions(map);
   };
+
+  const dupKey = (date: string, amount: number, description: string) =>
+    `${date}|${Math.round(Number(amount) * 100)}|${(description ?? "").trim().toLowerCase()}`;
+
+  const loadDuplicates = async (docId: string, sugs: Suggestion[]) => {
+    if (!user || sugs.length === 0) {
+      setDupKeys((prev) => ({ ...prev, [docId]: new Set() }));
+      return new Set<string>();
+    }
+    const dates = Array.from(new Set(sugs.map((s) => s.data)));
+    const amounts = Array.from(new Set(sugs.map((s) => Number(s.valor))));
+    const { data } = await supabase
+      .from("transactions")
+      .select("date,amount,description")
+      .eq("user_id", user.id)
+      .in("date", dates)
+      .in("amount", amounts);
+    const existing = new Set<string>(
+      (data ?? []).map((t) =>
+        dupKey(t.date as string, Number(t.amount), (t.description as string) ?? ""),
+      ),
+    );
+    const dups = new Set<string>();
+    sugs.forEach((s) => {
+      const k = dupKey(s.data, Number(s.valor), s.descricao);
+      if (existing.has(k)) dups.add(k);
+    });
+    setDupKeys((prev) => ({ ...prev, [docId]: dups }));
+    return dups;
+  };
+
+  useEffect(() => {
+    if (!openDocId) return;
+    const ex = extractions[openDocId];
+    if (ex) void loadDuplicates(openDocId, ex.suggestions);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openDocId, extractions]);
 
   useEffect(() => {
     void load();
@@ -172,7 +216,7 @@ function DocumentosPage() {
     void load();
   };
 
-  const approve = async (docId: string, sug: Suggestion, idx: number) => {
+  const insertOne = async (docId: string, sug: Suggestion, idx: number) => {
     if (!user) return;
     const { data: cats } = await supabase
       .from("categories")
@@ -197,6 +241,16 @@ function DocumentosPage() {
     rejectSuggestion(docId, idx);
   };
 
+  const approve = async (docId: string, sug: Suggestion, idx: number) => {
+    const dups = dupKeys[docId] ?? (await loadDuplicates(docId, extractions[docId]?.suggestions ?? []));
+    const k = dupKey(sug.data, Number(sug.valor), sug.descricao);
+    if (dups.has(k)) {
+      setConfirmDup({ docId, indices: [idx], duplicates: [idx], bulk: false });
+      return;
+    }
+    await insertOne(docId, sug, idx);
+  };
+
   const toggleSelect = (docId: string, idx: number) => {
     setSelected((prev) => {
       const set = new Set(prev[docId] ?? []);
@@ -219,9 +273,26 @@ function DocumentosPage() {
     const ex = extractions[docId];
     const set = selected[docId];
     if (!ex || !set || set.size === 0) return;
+    const dups = await loadDuplicates(docId, ex.suggestions);
+    const indices = Array.from(set);
+    const duplicates = indices.filter((i) => {
+      const s = ex.suggestions[i];
+      return s && dups.has(dupKey(s.data, Number(s.valor), s.descricao));
+    });
+    if (duplicates.length > 0) {
+      setConfirmDup({ docId, indices, duplicates, bulk: true });
+      return;
+    }
+    await runBulkInsert(docId, indices);
+  };
+
+  const runBulkInsert = async (docId: string, indices: number[]) => {
+    if (!user) return;
+    const ex = extractions[docId];
+    if (!ex || indices.length === 0) return;
     setBulkBusy(true);
     try {
-      const sugs = Array.from(set).map((i) => ({ idx: i, s: ex.suggestions[i] })).filter((x) => x.s);
+      const sugs = indices.map((i) => ({ idx: i, s: ex.suggestions[i] })).filter((x) => x.s);
       const { data: cats } = await supabase.from("categories").select("id,name,type");
       const { data: accounts } = await supabase.from("accounts").select("id").limit(1);
       const accountId = accounts?.[0]?.id ?? null;
@@ -244,7 +315,8 @@ function DocumentosPage() {
       });
       const { error } = await supabase.from("transactions").insert(rows);
       if (error) throw error;
-      const remaining = ex.suggestions.filter((_, i) => !set.has(i));
+      const idxSet = new Set(indices);
+      const remaining = ex.suggestions.filter((_, i) => !idxSet.has(i));
       await supabase
         .from("document_extractions")
         .update({ suggestions: remaining })
