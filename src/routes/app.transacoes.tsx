@@ -49,6 +49,7 @@ interface Cat {
   name: string;
   type: "income" | "expense";
   color: string;
+  parent_id: string | null;
 }
 interface Acc {
   id: string;
@@ -63,6 +64,33 @@ const MONTH_LABEL = (key: string) => {
   const s = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(d);
   return s.charAt(0).toUpperCase() + s.slice(1);
 };
+
+function buildCatTree(cats: Cat[]): { cat: Cat; depth: number }[] {
+  const parents = cats.filter((c) => !c.parent_id);
+  const out: { cat: Cat; depth: number }[] = [];
+  for (const p of parents) {
+    out.push({ cat: p, depth: 0 });
+    for (const child of cats.filter((c) => c.parent_id === p.id)) {
+      out.push({ cat: child, depth: 1 });
+    }
+  }
+  // Append orphans (parent not in same type list) just in case
+  for (const c of cats) {
+    if (c.parent_id && !out.find((o) => o.cat.id === c.id)) {
+      out.push({ cat: c, depth: 1 });
+    }
+  }
+  return out;
+}
+
+function catFullName(cat: Cat | undefined, all: Cat[]): string {
+  if (!cat) return "Sem categoria";
+  if (cat.parent_id) {
+    const p = all.find((c) => c.id === cat.parent_id);
+    if (p) return `${p.name} › ${cat.name}`;
+  }
+  return cat.name;
+}
 
 function TransactionsPage() {
   const { user } = useAuth();
@@ -79,7 +107,7 @@ function TransactionsPage() {
   const load = async () => {
     const [{ data: t }, { data: c }, { data: a }] = await Promise.all([
       supabase.from("transactions").select("*").order("date", { ascending: false }).limit(500),
-      supabase.from("categories").select("id,name,type,color").order("name"),
+      supabase.from("categories").select("id,name,type,color,parent_id").order("name"),
       supabase.from("accounts").select("id,name"),
     ]);
     setTx((t ?? []) as Tx[]);
@@ -186,19 +214,17 @@ function TransactionsPage() {
           <SelectContent>
             <SelectItem value="all">Todas as categorias</SelectItem>
             <SelectItem value="__none__">Sem categoria</SelectItem>
-            {cats
-              .filter((c) => filterType === "all" || c.type === filterType)
-              .map((c) => (
+            {buildCatTree(
+              cats.filter((c) => filterType === "all" || c.type === filterType),
+            ).map(({ cat: c, depth }) => (
                 <SelectItem key={c.id} value={c.id}>
                   <span className="inline-flex items-center gap-2">
+                    {depth > 0 && <span className="text-muted-foreground">↳</span>}
                     <span
                       className="h-2.5 w-2.5 rounded-full"
                       style={{ backgroundColor: c.color }}
                     />
                     {c.name}
-                    <span className="text-xs text-muted-foreground">
-                      ({c.type === "income" ? "receita" : "despesa"})
-                    </span>
                   </span>
                 </SelectItem>
               ))}
@@ -267,7 +293,7 @@ function TransactionsPage() {
                                   {t.description || cat?.name || "Sem descrição"}
                                 </div>
                                 <div className="text-xs text-muted-foreground">
-                                  {cat?.name ?? "Sem categoria"} •{" "}
+                                  {catFullName(cat, cats)} •{" "}
                                   {new Date(t.date + "T00:00:00").toLocaleDateString("pt-BR")}
                                 </div>
                               </div>
@@ -412,9 +438,12 @@ function EditCategoryDialog({
                     <SelectValue placeholder="Selecionar" />
                   </SelectTrigger>
                   <SelectContent>
-                    {filteredCats.map((c) => (
+                    {buildCatTree(filteredCats).map(({ cat: c, depth }) => (
                       <SelectItem key={c.id} value={c.id}>
-                        {c.name}
+                        <span className="inline-flex items-center gap-2">
+                          {depth > 0 && <span className="text-muted-foreground">↳</span>}
+                          {c.name}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -579,9 +608,12 @@ function TransactionDialog({
                 <SelectValue placeholder="Selecionar" />
               </SelectTrigger>
               <SelectContent>
-                {filteredCats.map((c) => (
+                {buildCatTree(filteredCats).map(({ cat: c, depth }) => (
                   <SelectItem key={c.id} value={c.id}>
-                    {c.name}
+                    <span className="inline-flex items-center gap-2">
+                      {depth > 0 && <span className="text-muted-foreground">↳</span>}
+                      {c.name}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
