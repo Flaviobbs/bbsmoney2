@@ -70,6 +70,7 @@ function TransactionsPage() {
   const [accs, setAccs] = useState<Acc[]>([]);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"all" | "income" | "expense">("all");
+  const [filterCategory, setFilterCategory] = useState<string>("all");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Tx | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -98,6 +99,11 @@ function TransactionsPage() {
 
   const filtered = tx.filter((t) => {
     if (filterType !== "all" && t.type !== filterType) return false;
+    if (filterCategory !== "all") {
+      if (filterCategory === "__none__") {
+        if (t.category_id) return false;
+      } else if (t.category_id !== filterCategory) return false;
+    }
     if (search && !t.description.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
@@ -157,6 +163,34 @@ function TransactionsPage() {
             <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="income">Receitas</SelectItem>
             <SelectItem value="expense">Despesas</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          value={filterCategory}
+          onValueChange={(v) => setFilterCategory(v)}
+        >
+          <SelectTrigger className="w-52">
+            <SelectValue placeholder="Categoria" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as categorias</SelectItem>
+            <SelectItem value="__none__">Sem categoria</SelectItem>
+            {cats
+              .filter((c) => filterType === "all" || c.type === filterType)
+              .map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: c.color }}
+                    />
+                    {c.name}
+                    <span className="text-xs text-muted-foreground">
+                      ({c.type === "income" ? "receita" : "despesa"})
+                    </span>
+                  </span>
+                </SelectItem>
+              ))}
           </SelectContent>
         </Select>
       </div>
