@@ -16,6 +16,7 @@ export const Route = createFileRoute("/app/configuracoes")({
 function SettingsPage() {
   const { user, signOut } = useAuth();
   const [name, setName] = useState("");
+  const [pdfPassword, setPdfPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [waMsg, setWaMsg] = useState("Gastei 50 reais no mercado hoje");
   const [waLoading, setWaLoading] = useState(false);
@@ -25,10 +26,13 @@ function SettingsPage() {
     if (!user) return;
     supabase
       .from("profiles")
-      .select("display_name")
+      .select("display_name,pdf_password")
       .eq("id", user.id)
       .maybeSingle()
-      .then(({ data }) => setName(data?.display_name ?? ""));
+      .then(({ data }) => {
+        setName(data?.display_name ?? "");
+        setPdfPassword(data?.pdf_password ?? "");
+      });
   }, [user]);
 
   const save = async () => {
@@ -36,7 +40,7 @@ function SettingsPage() {
     setSaving(true);
     const { error } = await supabase
       .from("profiles")
-      .update({ display_name: name })
+      .update({ display_name: name, pdf_password: pdfPassword || null })
       .eq("id", user.id);
     setSaving(false);
     if (error) return toast.error(error.message);
@@ -92,6 +96,20 @@ function SettingsPage() {
           <div className="space-y-2">
             <Label>Nome de exibição</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Senha padrão para PDFs protegidos</Label>
+            <Input
+              type="password"
+              value={pdfPassword}
+              onChange={(e) => setPdfPassword(e.target.value)}
+              placeholder="Opcional — usada ao processar faturas com senha"
+              autoComplete="off"
+            />
+            <p className="text-xs text-muted-foreground">
+              Será usada automaticamente ao processar PDFs protegidos. Você ainda pode informar
+              uma senha diferente em cada documento.
+            </p>
           </div>
           <div className="flex gap-2">
             <Button onClick={save} disabled={saving}>
