@@ -1,54 +1,45 @@
-## Status atual
+## 1) Filtro por categoria na aba "Transações"
 
-- **Fase 1** ✅ Auth, contas, categorias, transações, dashboard básico
-- **Fase 2** ✅ Contas a pagar/receber com recorrência
-- **Fase 3** ✅ Orçamentos por categoria e metas
+Adicionar um terceiro filtro ao lado de busca/tipo, em `src/routes/app.transacoes.tsx`:
 
-## Fase 4 — Inteligência (próxima)
+- Novo estado `filterCategory: string` ("all" por padrão).
+- Novo `<Select>` "Categoria" listando todas as categorias do usuário (já carregadas em `cats`), com opção "Todas" e um separador visual entre receitas e despesas (ou simplesmente ordenadas por nome com pequeno indicador da cor).
+- Aplicar o filtro em `filtered`: se `filterCategory !== "all"`, manter só transações com `category_id === filterCategory` (incluindo opção especial "Sem categoria" → `category_id === null`).
+- Quando o usuário alterar o filtro de tipo (Receitas/Despesas) e a categoria selecionada não pertencer ao novo tipo, resetar `filterCategory` para "all".
+- Layout responsivo: empilhar os selects abaixo da busca em telas estreitas.
 
-Foco em diferenciar o produto via IA e automação leve, conforme RF10–RF15 do documento de requisitos.
+## 2) Evitar duplicatas ao reprocessar PDFs
 
-### 4.1 Upload e processamento de PDFs (RF10–RF12)
+A causa: ao reprocessar um documento, a IA gera as mesmas sugestões e a aprovação (individual ou em lote) insere tudo novamente em `transactions`. Solução em duas camadas no `src/routes/app.documentos.tsx`:
 
-- Bucket de Storage `documents` (privado, RLS por `user_id`)
-- Tabelas `documents` e `document_extractions`
-- Página `/app/documentos`: upload, lista com status (`uploaded`/`processing`/`processed`/`failed`)
-- Edge function `extract-pdf-text`: baixa PDF do storage, extrai texto (pdf-parse) e salva
-- Edge function `suggest-transactions-from-pdf`: usa Lovable AI (`google/gemini-2.5-flash`) para sugerir transações estruturadas (descrição, valor, data, categoria)
-- UI de aprovação: usuário revisa cada sugestão antes de virar `transaction` (origem `pdf`)
+### a) Detecção de duplicatas no momento da aprovação
 
-### 4.2 API de entrada simulada tipo WhatsApp (RF13)
+Critério de duplicata (transação "idêntica"):
 
-- Edge function pública `simulate-whatsapp-entry` (sob `/api/public/` ou edge function direta)
-- Recebe `{ message, user_id }`, usa Lovable AI para extrair valor/categoria/tipo/data
-- Cria `transaction` com `source='whatsapp_simulado'`
-- Tela de teste em `/app/configuracoes` com input + curl de exemplo
+- mesmo `user_id`
+- mesmo `date`
+- mesmo `amount` (comparado como número)
+- mesma `description` (case-insensitive, trim)
 
-### 4.3 Insights financeiros com IA (RF14–RF15)
+Antes de inserir (tanto no `approve` individual quanto no `bulkApprove`), consultar `transactions` filtrando por esses campos. Se houver match:
 
-- Tabela `ai_insights` (period_start, period_end, summary, recommendations, risk_alerts)
-- Edge function `generate-financial-insights`: agrega transações do mês (totais por categoria, evolução, top despesas) e envia agregados para Lovable AI
-- Página `/app/insights`: botão "Gerar insights do mês", histórico de análises anteriores
-- Card resumo no dashboard com último insight
+- **Aprovação individual**: abrir um diálogo de confirmação ("Já existe uma transação idêntica em DD/MM/AAAA no valor de R$ X. Deseja cadastrar mesmo assim?"). Botões: "Cadastrar duplicada" / "Pular".
+- **Aprovação em lote**: para cada sugestão duplicada, acumular num diálogo único listando todas as duplicatas detectadas, com 3 ações: "Pular duplicadas" (insere apenas as únicas), "Cadastrar tudo mesmo assim" (insere todas), "Cancelar".
 
-### 4.4 Ajustes de modelo
+### b) Marcação visual nas sugestões
 
-Migration adicionando:
-- `transactions.source` (enum: `manual`/`pdf`/`whatsapp_simulado`/`ia`), default `manual`
-- `transactions.merchant`, `transactions.notes`, `transactions.document_id`
-- Tabelas `documents`, `document_extractions`, `ai_insights`, `ingestion_logs`
+Ao expandir a lista de sugestões de um documento, fazer uma única consulta às transações do usuário para o intervalo de datas das sugestões e marcar cada item duplicado com um badge "Já cadastrada" (cinza). Itens duplicados ainda podem ser selecionados/aprovados, mas o usuário vê de antemão.
 
-## Escopo recomendado para esta fase
+### Detalhes técnicos
 
-Sugiro dividir em **duas entregas** para manter previsibilidade:
+- Consulta de duplicatas: `supabase.from("transactions").select("date,amount,description").eq("user_id", user.id).in("date", [datas...]).in("amount", [valores...])` e filtrar no cliente por descrição normalizada — evita N+1 e custa uma única ida ao banco por ação.
+- Normalização de descrição: `.trim().toLowerCase()`.
+- Comparação de valor: arredondar para 2 casas (`Math.round(n*100)`) para evitar problemas de float.
+- Não alterar a lógica do endpoint `api.documents.process.ts` — a duplicação ocorre na aprovação, não na extração. As sugestões continuam sendo regeneradas normalmente ao reprocessar.
 
-- **Fase 4a**: Insights com IA (4.3 + ajustes mínimos de modelo) — entrega rápida, alto valor percebido
-- **Fase 4b**: PDFs + WhatsApp simulado (4.1 + 4.2) — mais complexa, envolve storage e parsing
+### Arquivos afetados
 
-## Fora do escopo (Fase 5+)
+- `src/routes/app.transacoes.tsx` — novo filtro de categoria.
+- `src/routes/app.documentos.tsx` — detecção de duplicatas, badge visual, diálogo de confirmação para aprovação individual e em lote.
 
-WhatsApp real, Open Finance, OCR de PDFs escaneados, importação CSV, app mobile, modo familiar, previsão de fluxo de caixa.
-
-## Pergunta
-
-Quer que eu comece pela **4a (Insights IA)** ou prefere ir direto para a **4b (PDFs + WhatsApp simulado)**? Ou seguir as duas juntas como Fase 4 completa?
+Sem mudanças de schema nem de backend.
