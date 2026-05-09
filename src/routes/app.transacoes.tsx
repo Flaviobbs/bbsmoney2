@@ -442,9 +442,12 @@ function EditCategoryDialog({
                     <SelectValue placeholder="Selecionar" />
                   </SelectTrigger>
                   <SelectContent>
-                    {filteredCats.map((c) => (
+                    {buildCatTree(filteredCats).map(({ cat: c, depth }) => (
                       <SelectItem key={c.id} value={c.id}>
-                        {c.name}
+                        <span className="inline-flex items-center gap-2">
+                          {depth > 0 && <span className="text-muted-foreground">↳</span>}
+                          {c.name}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -609,9 +612,12 @@ function TransactionDialog({
                 <SelectValue placeholder="Selecionar" />
               </SelectTrigger>
               <SelectContent>
-                {filteredCats.map((c) => (
+                {buildCatTree(filteredCats).map(({ cat: c, depth }) => (
                   <SelectItem key={c.id} value={c.id}>
-                    {c.name}
+                    <span className="inline-flex items-center gap-2">
+                      {depth > 0 && <span className="text-muted-foreground">↳</span>}
+                      {c.name}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
