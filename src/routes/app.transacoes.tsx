@@ -155,7 +155,17 @@ function TransactionsPage() {
             className="pl-9"
           />
         </div>
-        <Select value={filterType} onValueChange={(v) => setFilterType(v as typeof filterType)}>
+        <Select
+          value={filterType}
+          onValueChange={(v) => {
+            const next = v as typeof filterType;
+            setFilterType(next);
+            if (filterCategory !== "all" && filterCategory !== "__none__") {
+              const c = cats.find((x) => x.id === filterCategory);
+              if (c && next !== "all" && c.type !== next) setFilterCategory("all");
+            }
+          }}
+        >
           <SelectTrigger className="w-40">
             <SelectValue />
           </SelectTrigger>
