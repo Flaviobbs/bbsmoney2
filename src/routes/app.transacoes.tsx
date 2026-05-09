@@ -49,6 +49,7 @@ interface Cat {
   name: string;
   type: "income" | "expense";
   color: string;
+  parent_id: string | null;
 }
 interface Acc {
   id: string;
@@ -79,7 +80,7 @@ function TransactionsPage() {
   const load = async () => {
     const [{ data: t }, { data: c }, { data: a }] = await Promise.all([
       supabase.from("transactions").select("*").order("date", { ascending: false }).limit(500),
-      supabase.from("categories").select("id,name,type,color").order("name"),
+      supabase.from("categories").select("id,name,type,color,parent_id").order("name"),
       supabase.from("accounts").select("id,name"),
     ]);
     setTx((t ?? []) as Tx[]);
