@@ -376,12 +376,13 @@ function EditCategoryDialog({
     } else {
       query = query.eq("id", tx.id);
     }
-    const { error, count } = await query.select("id", { count: "exact" });
+    const { data: updated, error } = await query.select("id");
     setSaving(false);
     if (error) return toast.error(error.message);
+    const count = updated?.length ?? 0;
     toast.success(
       applyAll && desc
-        ? `Categoria atualizada em ${count ?? 0} transaç${(count ?? 0) === 1 ? "ão" : "ões"}`
+        ? `Categoria atualizada em ${count} transaç${count === 1 ? "ão" : "ões"}`
         : "Categoria atualizada",
     );
     onSaved();
