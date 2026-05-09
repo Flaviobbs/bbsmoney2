@@ -65,6 +65,33 @@ const MONTH_LABEL = (key: string) => {
   return s.charAt(0).toUpperCase() + s.slice(1);
 };
 
+function buildCatTree(cats: Cat[]): { cat: Cat; depth: number }[] {
+  const parents = cats.filter((c) => !c.parent_id);
+  const out: { cat: Cat; depth: number }[] = [];
+  for (const p of parents) {
+    out.push({ cat: p, depth: 0 });
+    for (const child of cats.filter((c) => c.parent_id === p.id)) {
+      out.push({ cat: child, depth: 1 });
+    }
+  }
+  // Append orphans (parent not in same type list) just in case
+  for (const c of cats) {
+    if (c.parent_id && !out.find((o) => o.cat.id === c.id)) {
+      out.push({ cat: c, depth: 1 });
+    }
+  }
+  return out;
+}
+
+function catFullName(cat: Cat | undefined, all: Cat[]): string {
+  if (!cat) return "Sem categoria";
+  if (cat.parent_id) {
+    const p = all.find((c) => c.id === cat.parent_id);
+    if (p) return `${p.name} › ${cat.name}`;
+  }
+  return cat.name;
+}
+
 function TransactionsPage() {
   const { user } = useAuth();
   const [tx, setTx] = useState<Tx[]>([]);
@@ -189,17 +216,19 @@ function TransactionsPage() {
             <SelectItem value="__none__">Sem categoria</SelectItem>
             {cats
               .filter((c) => filterType === "all" || c.type === filterType)
-              .map((c) => (
+              .reduce<{ cat: Cat; depth: number }[]>((acc, _c, _i, arr) => {
+                if (acc.length) return acc;
+                return buildCatTree(arr);
+              }, [])
+              .map(({ cat: c, depth }) => (
                 <SelectItem key={c.id} value={c.id}>
                   <span className="inline-flex items-center gap-2">
+                    {depth > 0 && <span className="text-muted-foreground">↳</span>}
                     <span
                       className="h-2.5 w-2.5 rounded-full"
                       style={{ backgroundColor: c.color }}
                     />
                     {c.name}
-                    <span className="text-xs text-muted-foreground">
-                      ({c.type === "income" ? "receita" : "despesa"})
-                    </span>
                   </span>
                 </SelectItem>
               ))}
@@ -268,7 +297,7 @@ function TransactionsPage() {
                                   {t.description || cat?.name || "Sem descrição"}
                                 </div>
                                 <div className="text-xs text-muted-foreground">
-                                  {cat?.name ?? "Sem categoria"} •{" "}
+                                  {catFullName(cat, cats)} •{" "}
                                   {new Date(t.date + "T00:00:00").toLocaleDateString("pt-BR")}
                                 </div>
                               </div>
