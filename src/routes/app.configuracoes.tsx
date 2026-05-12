@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { useTheme } from "@/lib/theme";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export const Route = createFileRoute("/app/configuracoes")({
   component: SettingsPage,
@@ -15,6 +17,7 @@ export const Route = createFileRoute("/app/configuracoes")({
 
 function SettingsPage() {
   const { user, signOut } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [name, setName] = useState("");
   const [pdfPassword, setPdfPassword] = useState("");
   const [saving, setSaving] = useState(false);
@@ -119,6 +122,34 @@ function SettingsPage() {
               Sair
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="max-w-xl">
+        <CardHeader>
+          <CardTitle className="text-base">Aparência</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <RadioGroup
+            value={theme}
+            onValueChange={(v) => setTheme(v as "light" | "dark" | "system")}
+            className="grid gap-3"
+          >
+            {[
+              { v: "light", label: "Claro" },
+              { v: "dark", label: "Escuro" },
+              { v: "system", label: "Seguir o sistema" },
+            ].map((opt) => (
+              <Label
+                key={opt.v}
+                htmlFor={`theme-${opt.v}`}
+                className="flex cursor-pointer items-center gap-3 rounded-md border border-border p-3 hover:bg-accent"
+              >
+                <RadioGroupItem id={`theme-${opt.v}`} value={opt.v} />
+                <span>{opt.label}</span>
+              </Label>
+            ))}
+          </RadioGroup>
         </CardContent>
       </Card>
 
