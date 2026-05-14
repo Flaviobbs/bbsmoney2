@@ -8,6 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Sparkles, AlertTriangle, Lightbulb, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/format";
+import { Textarea } from "@/components/ui/textarea";
+import { InvoiceProcessorUI } from "@/components/InvoiceProcessorUI";
+import type { InvoiceLine } from "@/types/ProcessedInvoice";
 
 export const Route = createFileRoute("/app/insights")({
   component: InsightsPage,
@@ -28,6 +31,22 @@ function InsightsPage() {
   const [items, setItems] = useState<Insight[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [rawInvoice, setRawInvoice] = useState("");
+  const [parsedLines, setParsedLines] = useState<InvoiceLine[]>([]);
+
+  const parseRaw = (text: string): InvoiceLine[] => {
+    const out: InvoiceLine[] = [];
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    for (const l of lines) {
+      const parts = l.split(/[;\t]/).map((p) => p.trim());
+      if (parts.length < 3) continue;
+      const [date, description, valueRaw] = parts;
+      const value = Number(valueRaw.replace(/\./g, "").replace(",", "."));
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !description || !Number.isFinite(value)) continue;
+      out.push({ date, description, value });
+    }
+    return out;
+  };
 
   const load = async () => {
     const { data } = await supabase
@@ -151,6 +170,35 @@ function InsightsPage() {
           ))}
         </div>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Importar linhas de fatura</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Cole linhas no formato <code>data;descrição;valor</code> (uma por linha). Ex.:{" "}
+            <code>2026-01-10;TV Parcelado 1/3;1500,00</code>
+          </p>
+          <Textarea
+            rows={5}
+            value={rawInvoice}
+            onChange={(e) => {
+              setRawInvoice(e.target.value);
+              setParsedLines(parseRaw(e.target.value));
+            }}
+            placeholder="2026-01-10;Padaria;15,90"
+          />
+          <div className="text-xs text-muted-foreground">
+            {parsedLines.length} linha(s) reconhecida(s)
+          </div>
+        </CardContent>
+      </Card>
+
+      <InvoiceProcessorUI
+        invoiceLines={parsedLines}
+        onProcessed={() => toast.success("Pré-processamento concluído")}
+      />
     </div>
   );
 }
