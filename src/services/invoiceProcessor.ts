@@ -110,9 +110,6 @@ export function calculateDueDate(originalDate: string, parcelIndex: number): str
   }
 }
 
-const DATE_DDMMYYYY = /\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/;
-const DATE_DDMM = /\b(\d{1,2})[\/\-.](\d{1,2})\b/;
-
 const DATE_DDMMYYYY = /\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/g;
 const DATE_DDMM = /\b(\d{1,2})[\/\-.](\d{1,2})\b/g;
 
