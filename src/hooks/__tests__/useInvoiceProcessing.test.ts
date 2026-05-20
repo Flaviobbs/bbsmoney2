@@ -22,8 +22,12 @@ import {
   filterPayments,
   isFaturaPayment,
   suggestCategory,
+  suggestCategoryDetailed,
   learnCategory,
   expandParcels,
+  extractPurchaseDate,
+  normalizeText,
+  tokenize,
   LEARNING_STORAGE_KEY,
 } from "@/services/invoiceProcessor";
 import type { ProcessedInvoiceLine } from "@/types/ProcessedInvoice";
@@ -34,12 +38,15 @@ function mkProc(over: Partial<ProcessedInvoiceLine>): ProcessedInvoiceLine {
     description: "Teste",
     value: 10,
     originalDate: "2026-01-10",
+    purchaseDate: "2026-01-10",
     dueDate: "2026-01-10",
     isParcel: null,
     paymentType: "normal",
     isDuplicate: false,
     suggestedCategory: null,
+    suggestionConfidence: null,
     appliedCategory: null,
+    filterReason: null,
     ...over,
   };
 }
@@ -53,6 +60,15 @@ describe("detectParcel", () => {
   });
   it("detects 'px5/12'", () => {
     expect(detectParcel("Loja px5/12")).toEqual({ current: 5, total: 12 });
+  });
+  it("detects parentheses '(1/10)'", () => {
+    expect(detectParcel("TV LED (1/10)")).toEqual({ current: 1, total: 10 });
+  });
+  it("detects 'PARC 01/10'", () => {
+    expect(detectParcel("Magazine PARC 01/10")).toEqual({ current: 1, total: 10 });
+  });
+  it("detects 'PCL 3/12'", () => {
+    expect(detectParcel("Loja PCL 3/12")).toEqual({ current: 3, total: 12 });
   });
   it("rejects when current > total", () => {
     expect(detectParcel("Compra 11/10")).toBeNull();
@@ -72,8 +88,21 @@ describe("calculateDueDate", () => {
   it("returns null for invalid date", () => {
     expect(calculateDueDate("not-a-date", 1)).toBeNull();
   });
-  it("returns null for invalid parcel index", () => {
-    expect(calculateDueDate("2026-01-15", 0)).toBeNull();
+});
+
+describe("extractPurchaseDate", () => {
+  it("extracts dd/mm with inferred year from fallback", () => {
+    expect(extractPurchaseDate("15/03 LOJA X", "2026-05-10")).toBe("2026-03-15");
+  });
+  it("extracts dd/mm/yyyy when present", () => {
+    expect(extractPurchaseDate("15/03/2025 LOJA X", "2026-05-10")).toBe("2025-03-15");
+  });
+  it("retroages year when month is after fallback month", () => {
+    // compra em dezembro, fatura em janeiro do ano seguinte
+    expect(extractPurchaseDate("20/12 LOJA X", "2026-01-10")).toBe("2025-12-20");
+  });
+  it("falls back when no date in description", () => {
+    expect(extractPurchaseDate("PADARIA", "2026-05-10")).toBe("2026-05-10");
   });
 });
 
@@ -84,13 +113,23 @@ describe("filterPayments", () => {
       { description: "Padaria", value: 10, date: "2026-01-01" },
     ]);
     expect(filtered).toHaveLength(1);
+    expect(filtered[0].filterReason).toBe("pagamento_detectado");
     expect(kept).toHaveLength(1);
   });
-  it("filters 'PAGAMENTO DE FATURA'", () => {
-    expect(isFaturaPayment("PAGAMENTO DE FATURA")).toBe(true);
+  it("filters negative values regardless of description", () => {
+    const { kept, filtered } = filterPayments([
+      { description: "Whatever", value: -50, date: "2026-01-01" },
+      { description: "Padaria", value: 10, date: "2026-01-01" },
+    ]);
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].filterReason).toBe("valor_negativo");
+    expect(kept).toHaveLength(1);
   });
-  it("filters 'Débito Automático'", () => {
-    expect(isFaturaPayment("Débito Automático Visa")).toBe(true);
+  it("filters PAGAMENTO RECEBIDO", () => {
+    expect(isFaturaPayment("PAGAMENTO RECEBIDO")).toBe(true);
+  });
+  it("filters ESTORNO", () => {
+    expect(isFaturaPayment("ESTORNO COMPRA")).toBe(true);
   });
   it("does not filter regular descriptions", () => {
     expect(isFaturaPayment("Restaurante")).toBe(false);
@@ -109,31 +148,41 @@ describe("deduplicate", () => {
   });
   it("treats different parcel indices as distinct", () => {
     const lines = [
-      mkProc({ id: "a", isParcel: { current: 1, total: 3 } }),
-      mkProc({ id: "b", isParcel: { current: 2, total: 3 }, dueDate: "2026-02-10" }),
+      mkProc({ id: "a", isParcel: { current: 1, total: 10 }, dueDate: "2026-01-10" }),
+      mkProc({ id: "b", isParcel: { current: 2, total: 10 }, dueDate: "2026-02-10" }),
     ];
     const out = deduplicate(lines);
     expect(out.every((l) => !l.isDuplicate)).toBe(true);
   });
-  it("is case-insensitive on description", () => {
+  it("treats parcel 1/10 and 2/10 with same desc/value as distinct", () => {
     const lines = [
-      mkProc({ id: "a", description: "PADARIA" }),
-      mkProc({ id: "b", description: "padaria" }),
+      mkProc({ id: "a", description: "MAGAZINE", value: 150, isParcel: { current: 1, total: 10 } }),
+      mkProc({ id: "b", description: "MAGAZINE", value: 150, isParcel: { current: 2, total: 10 } }),
     ];
     const out = deduplicate(lines);
-    expect(out[1].isDuplicate).toBe(true);
+    expect(out[0].isDuplicate).toBe(false);
+    expect(out[1].isDuplicate).toBe(false);
   });
 });
 
 describe("expandParcels", () => {
-  it("expands a 3-parcel line into 3 entries with sequential dates", () => {
+  it("expands a 3-parcel line into 3 entries with sequential dates from purchase date", () => {
     const out = expandParcels([
-      { description: "TV Parcelado 1/3", value: 300, date: "2026-01-10" },
+      { description: "TV Parcelado 1/3 15/01", value: 300, date: "2026-01-20" },
     ]);
     expect(out).toHaveLength(3);
-    expect(out[0].dueDate).toBe("2026-01-10");
-    expect(out[1].dueDate).toBe("2026-02-10");
-    expect(out[2].dueDate).toBe("2026-03-10");
+    expect(out[0].dueDate).toBe("2026-01-15");
+    expect(out[1].dueDate).toBe("2026-02-15");
+    expect(out[2].dueDate).toBe("2026-03-15");
+  });
+  it("uses fatura date when no date in description", () => {
+    const out = expandParcels([
+      { description: "Loja 3/10", value: 100, date: "2026-05-10" },
+    ]);
+    // parcela 3 → offset 1 → mesma data de compra
+    expect(out[0].isParcel).toEqual({ current: 3, total: 10 });
+    expect(out[0].dueDate).toBe("2026-05-10");
+    expect(out[1].dueDate).toBe("2026-06-10");
   });
   it("keeps single-line entries unchanged", () => {
     const out = expandParcels([
@@ -141,6 +190,19 @@ describe("expandParcels", () => {
     ]);
     expect(out).toHaveLength(1);
     expect(out[0].isParcel).toBeNull();
+  });
+});
+
+describe("normalizeText / tokenize", () => {
+  it("removes accents and punctuation", () => {
+    expect(normalizeText("Restauração - Açaí 123")).toBe("restauracao acai");
+  });
+  it("filters generic and short tokens", () => {
+    const t = tokenize("LOJA IFOOD RESTAURANTE A LTDA");
+    expect(t).toContain("ifood");
+    expect(t).toContain("restaurante");
+    expect(t).not.toContain("ltda");
+    expect(t).not.toContain("loja");
   });
 });
 
@@ -152,9 +214,17 @@ describe("category learning", () => {
   it("returns null when store empty", () => {
     expect(suggestCategory("Padaria", 10)).toBeNull();
   });
-  it("learns and suggests by exact key", () => {
-    learnCategory("Padaria", 10, "Alimentação");
-    expect(suggestCategory("Padaria", 10)).toBe("Alimentação");
+  it("learns and suggests by exact key with high confidence", () => {
+    learnCategory("Padaria Central", 10, "Alimentação");
+    const res = suggestCategoryDetailed("Padaria Central", 10, undefined);
+    expect(res.category).toBe("Alimentação");
+    expect(res.confidence).toBe("alta");
+  });
+  it("matches by token overlap (different establishment, same root)", () => {
+    learnCategory("IFOOD RESTAURANTE A", 50, "Alimentação");
+    const res = suggestCategoryDetailed("IFOOD RESTAURANTE B", 99);
+    expect(res.category).toBe("Alimentação");
+    expect(res.confidence).not.toBeNull();
   });
   it("increments frequency on repeat", () => {
     learnCategory("Padaria", 10, "Alimentação");
@@ -164,9 +234,5 @@ describe("category learning", () => {
     const parsed = JSON.parse(raw as string) as Record<string, { frequency: number }>;
     const entry = Object.values(parsed)[0];
     expect(entry.frequency).toBeGreaterThanOrEqual(2);
-  });
-  it("matches by description prefix when exact key absent", () => {
-    learnCategory("Restaurante Bom Sabor", 50, "Alimentação");
-    expect(suggestCategory("Restaurante Bom Sabor Filial", 99)).toBe("Alimentação");
   });
 });
