@@ -62,15 +62,17 @@ export function filterPayments(lines: InvoiceLine[]): {
 
 const PARCEL_REGEXES: RegExp[] = [
   /parcela\s*(\d{1,3})\s*(?:de|\/)\s*(\d{1,3})/i,
-  /parcelado\s*(\d{1,3})\s*\/\s*(\d{1,3})/i,
-  /\bparc\.?\s*(\d{1,3})\s*\/\s*(\d{1,3})/i,
-  /\bpcl\.?\s*(\d{1,3})\s*\/\s*(\d{1,3})/i,
-  /\bp[xX]?\s*(\d{1,3})\s*\/\s*(\d{1,3})/i,
-  /\((\d{1,3})\s*\/\s*(\d{1,3})\)/,
-  /\b(\d{1,3})\s*[ºo°]?\s*de\s*(\d{1,3})\b/i,
+  /parcelado\s*(?:em\s*)?(\d{1,3})\s*(?:\/|de|x)\s*(\d{1,3})/i,
+  /\bparc\.?\s*(\d{1,3})\s*[\/.\-]\s*(\d{1,3})/i,
+  /\bpcl\.?\s*(\d{1,3})\s*[\/.\-]\s*(\d{1,3})/i,
+  /\bp[xX]?\.?\s*(\d{1,3})\s*\/\s*(\d{1,3})/i,
+  /[\(\[\{]\s*(\d{1,3})\s*\/\s*(\d{1,3})\s*[\)\]\}]/,
+  /\b(\d{1,3})\s*[ºoa°ª]?\s*(?:de|of)\s*(\d{1,3})\b/i,
   /\b(\d{1,3})\s*-\s*(\d{1,3})\b/,
+  /\b(\d{1,3})\s*[xX]\s*(\d{1,3})\b/,
   /(?:^|\s)(\d{1,3})\s*\/\s*(\d{1,3})(?!\d)/,
 ];
+
 
 export function detectParcel(description: string): ParcelInfo | null {
   if (!description) return null;
