@@ -113,12 +113,21 @@ export function calculateDueDate(originalDate: string, parcelIndex: number): str
 const DATE_DDMMYYYY = /\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/;
 const DATE_DDMM = /\b(\d{1,2})[\/\-.](\d{1,2})\b/;
 
+function stripParcel(description: string): string {
+  let out = description;
+  for (const re of PARCEL_REGEXES) {
+    out = out.replace(re, " ");
+  }
+  return out;
+}
+
 export function extractPurchaseDate(
   description: string,
   fallbackDate: string,
 ): string | null {
   if (!description) return fallbackDate || null;
   try {
+    description = stripParcel(description);
     const fallback = parseISO(fallbackDate);
     if (!isValid(fallback)) return null;
 
