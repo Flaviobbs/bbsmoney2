@@ -4,7 +4,7 @@ export interface InvoiceLine {
   id?: string;
   description: string;
   value: number;
-  date: string; // ISO yyyy-MM-dd
+  date: string; // ISO yyyy-MM-dd — data de lançamento na fatura
 }
 
 export interface ParcelInfo {
@@ -14,18 +14,42 @@ export interface ParcelInfo {
 
 export type PaymentType = "fatura" | "normal";
 
+export type FilterReason =
+  | "valor_negativo"
+  | "pagamento_detectado"
+  | "credito"
+  | "estorno"
+  | null;
+
+export interface FilteredInvoiceLine extends InvoiceLine {
+  filterReason: Exclude<FilterReason, null>;
+}
+
+export type SuggestionConfidence = "alta" | "media" | "baixa" | null;
+
 export interface ProcessedInvoiceLine {
   id: string;
   originalId?: string;
   description: string;
   value: number;
-  originalDate: string;
-  dueDate: string | null;
+  originalDate: string; // data de lançamento na fatura (compatibilidade)
+  purchaseDate: string | null; // data real da compra extraída da descrição
+  dueDate: string | null; // purchaseDate + (parcela - 1) meses
   isParcel: ParcelInfo | null;
   paymentType: PaymentType;
   isDuplicate: boolean;
   suggestedCategory: string | null;
+  suggestionConfidence: SuggestionConfidence;
   appliedCategory: string | null;
+  filterReason: FilterReason;
+}
+
+export interface ProcessingSummary {
+  totalInput: number;
+  imported: number;
+  filtered: number;
+  duplicates: number;
+  parcelsExpanded: number;
 }
 
 export interface Correction {
@@ -39,6 +63,7 @@ export interface CategoryLearning {
   category: string;
   frequency: number;
   lastUpdated: string;
+  tokens?: string[]; // tokens normalizados da descrição
 }
 
 export type CategoryLearningStore = Record<string, CategoryLearning>;
@@ -51,19 +76,3 @@ export const invoiceLineSchema = z.object({
 });
 
 export const invoiceLinesSchema = z.array(invoiceLineSchema);
-
-export const processedInvoiceLineSchema: z.ZodType<ProcessedInvoiceLine> = z.object({
-  id: z.string(),
-  originalId: z.string().optional(),
-  description: z.string(),
-  value: z.number(),
-  originalDate: z.string(),
-  dueDate: z.string().nullable(),
-  isParcel: z
-    .object({ current: z.number().int().min(1), total: z.number().int().min(1) })
-    .nullable(),
-  paymentType: z.enum(["fatura", "normal"]),
-  isDuplicate: z.boolean(),
-  suggestedCategory: z.string().nullable(),
-  appliedCategory: z.string().nullable(),
-});

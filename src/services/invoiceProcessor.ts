@@ -1,23 +1,74 @@
-import { addMonths, format, isValid, parseISO } from "date-fns";
+import { addMonths, format, isValid, parseISO, setYear } from "date-fns";
 import type {
   CategoryLearning,
   CategoryLearningStore,
+  FilteredInvoiceLine,
   InvoiceLine,
   ParcelInfo,
   ProcessedInvoiceLine,
+  SuggestionConfidence,
 } from "@/types/ProcessedInvoice";
 
 export const LEARNING_STORAGE_KEY = "bbsmoney_category_learning";
 
-const PAYMENT_REGEX =
-  /deb\s*autom|debito\s*automatico|d[eé]bito\s*autom[aá]tico|pagamento\s*(de\s*)?fatura|pag\s*fatura/i;
+// ---------- Filtros de pagamento / crédito ----------
 
-// Supports: "01/10", "1/10", "Parcela 1 de 10", "Parcelado 3/12", "px5/12", "1 de 10"
+const PAYMENT_PATTERNS: Array<{ regex: RegExp; reason: "pagamento_detectado" | "credito" | "estorno" }> = [
+  { regex: /pagamento\s*recebido/i, reason: "pagamento_detectado" },
+  { regex: /pagamento\s*efetuado/i, reason: "pagamento_detectado" },
+  { regex: /pagamento\s*(de\s*)?fatura/i, reason: "pagamento_detectado" },
+  { regex: /pag(to|amento)/i, reason: "pagamento_detectado" },
+  { regex: /deb\s*autom|d[eé]bito\s*autom[aá]tico/i, reason: "pagamento_detectado" },
+  { regex: /saldo\s*anterior/i, reason: "pagamento_detectado" },
+  { regex: /estorno/i, reason: "estorno" },
+  { regex: /devolu[cç][aã]o/i, reason: "estorno" },
+  { regex: /cr[eé]dito/i, reason: "credito" },
+];
+
+export function detectPaymentReason(description: string): "pagamento_detectado" | "credito" | "estorno" | null {
+  if (!description) return null;
+  for (const { regex, reason } of PAYMENT_PATTERNS) {
+    if (regex.test(description)) return reason;
+  }
+  return null;
+}
+
+export function isFaturaPayment(description: string): boolean {
+  return detectPaymentReason(description) !== null;
+}
+
+export function filterPayments(lines: InvoiceLine[]): {
+  kept: InvoiceLine[];
+  filtered: FilteredInvoiceLine[];
+} {
+  const kept: InvoiceLine[] = [];
+  const filtered: FilteredInvoiceLine[] = [];
+  for (const line of lines) {
+    if (line.value < 0) {
+      filtered.push({ ...line, filterReason: "valor_negativo" });
+      continue;
+    }
+    const reason = detectPaymentReason(line.description);
+    if (reason) {
+      filtered.push({ ...line, filterReason: reason });
+      continue;
+    }
+    kept.push(line);
+  }
+  return { kept, filtered };
+}
+
+// ---------- Detecção de parcelas ----------
+
 const PARCEL_REGEXES: RegExp[] = [
   /parcela\s*(\d{1,3})\s*(?:de|\/)\s*(\d{1,3})/i,
   /parcelado\s*(\d{1,3})\s*\/\s*(\d{1,3})/i,
+  /\bparc\.?\s*(\d{1,3})\s*\/\s*(\d{1,3})/i,
+  /\bpcl\.?\s*(\d{1,3})\s*\/\s*(\d{1,3})/i,
   /\bp[xX]?\s*(\d{1,3})\s*\/\s*(\d{1,3})/i,
-  /\b(\d{1,3})\s*de\s*(\d{1,3})\b/i,
+  /\((\d{1,3})\s*\/\s*(\d{1,3})\)/,
+  /\b(\d{1,3})\s*[ºo°]?\s*de\s*(\d{1,3})\b/i,
+  /\b(\d{1,3})\s*-\s*(\d{1,3})\b/,
   /(?:^|\s)(\d{1,3})\s*\/\s*(\d{1,3})(?!\d)/,
 ];
 
@@ -30,10 +81,14 @@ export function detectParcel(description: string): ParcelInfo | null {
     const total = parseInt(m[2], 10);
     if (!Number.isFinite(current) || !Number.isFinite(total)) continue;
     if (current < 1 || total < 1 || current > total) continue;
+    // Evita capturar datas tipo dd/mm onde total < 13 e current > 12 (heurística leve)
+    if (total <= 12 && current > 12) continue;
     return { current, total };
   }
   return null;
 }
+
+// ---------- Datas ----------
 
 export function calculateDueDate(originalDate: string, parcelIndex: number): string | null {
   try {
@@ -55,56 +110,118 @@ export function calculateDueDate(originalDate: string, parcelIndex: number): str
   }
 }
 
-export function isFaturaPayment(description: string): boolean {
-  if (!description) return false;
-  return PAYMENT_REGEX.test(description.trim());
+const DATE_DDMMYYYY = /\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/g;
+const DATE_DDMM = /\b(\d{1,2})[\/\-.](\d{1,2})\b/g;
+
+export function extractPurchaseDate(
+  description: string,
+  fallbackDate: string,
+): string | null {
+  if (!description) return fallbackDate || null;
+  try {
+    const fallback = parseISO(fallbackDate);
+    if (!isValid(fallback)) return null;
+
+    // 1) data completa dd/mm/yyyy
+    for (const m of description.matchAll(DATE_DDMMYYYY)) {
+      const day = parseInt(m[1], 10);
+      const month = parseInt(m[2], 10);
+      let year = parseInt(m[3], 10);
+      if (year < 100) year += 2000;
+      if (month >= 1 && month <= 12 && isValidDateParts(year, month, day)) {
+        return format(new Date(year, month - 1, day), "yyyy-MM-dd");
+      }
+    }
+
+    // 2) data parcial dd/mm — para evitar colisão com indicador de parcela ("1/3"),
+    // só consideramos quando day > 12 OU month > 12 (inequívoco), e month ∈ [1..12]
+    for (const m of description.matchAll(DATE_DDMM)) {
+      const day = parseInt(m[1], 10);
+      const month = parseInt(m[2], 10);
+      if (month < 1 || month > 12) continue;
+      if (day <= 12 && month <= 12) continue; // ambíguo com parcela — descartar
+      if (day < 1 || day > 31) continue;
+      let year = fallback.getFullYear();
+      if (month > fallback.getMonth() + 1) year -= 1;
+      if (isValidDateParts(year, month, day)) {
+        return format(new Date(year, month - 1, day), "yyyy-MM-dd");
+      }
+    }
+
+    return fallbackDate;
+  } catch (err) {
+    console.error("[invoiceProcessor] extractPurchaseDate error", err);
+    return fallbackDate;
+  }
 }
 
-export function filterPayments(lines: InvoiceLine[]): {
-  kept: InvoiceLine[];
-  filtered: InvoiceLine[];
-} {
-  const kept: InvoiceLine[] = [];
-  const filtered: InvoiceLine[] = [];
-  for (const line of lines) {
-    if (isFaturaPayment(line.description)) filtered.push(line);
-    else kept.push(line);
-  }
-  return { kept, filtered };
+function isValidDateParts(year: number, month: number, day: number): boolean {
+  const d = new Date(year, month - 1, day);
+  return (
+    isValid(d) &&
+    d.getFullYear() === year &&
+    d.getMonth() === month - 1 &&
+    d.getDate() === day
+  );
 }
+
+// ---------- Deduplicação ----------
 
 function buildKey(p: {
   description: string;
   value: number;
   date: string;
-  parcelIndex: number | null;
+  parcelCurrent: number | null;
+  parcelTotal: number | null;
 }): string {
   const desc = p.description.toLowerCase().trim();
-  return `${desc}-${p.value}-${p.date}-${p.parcelIndex ?? "single"}`;
+  return `${desc}|${p.value}|${p.date}|${p.parcelCurrent ?? "x"}/${p.parcelTotal ?? "x"}`;
 }
 
 export function deduplicate(lines: ProcessedInvoiceLine[]): ProcessedInvoiceLine[] {
-  const seen = new Map<string, ProcessedInvoiceLine>();
+  const seen = new Set<string>();
   const out: ProcessedInvoiceLine[] = [];
   for (const line of lines) {
     const key = buildKey({
       description: line.description,
       value: line.value,
-      date: line.dueDate ?? line.originalDate,
-      parcelIndex: line.isParcel?.current ?? null,
+      date: line.dueDate ?? line.purchaseDate ?? line.originalDate,
+      parcelCurrent: line.isParcel?.current ?? null,
+      parcelTotal: line.isParcel?.total ?? null,
     });
     if (seen.has(key)) {
       out.push({ ...line, isDuplicate: true });
     } else {
-      const fresh = { ...line, isDuplicate: false };
-      seen.set(key, fresh);
-      out.push(fresh);
+      seen.add(key);
+      out.push({ ...line, isDuplicate: false });
     }
   }
   return out;
 }
 
-// ---------- Category learning (localStorage) ----------
+// ---------- Aprendizado de categoria ----------
+
+const GENERIC_TOKENS = new Set([
+  "ltda", "me", "mei", "sa", "s/a", "br", "com", "pag", "mp", "pagamento",
+  "compra", "loja", "online", "internet", "card", "cartao", "cartão",
+]);
+
+export function normalizeText(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\b\d+\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function tokenize(s: string): string[] {
+  return normalizeText(s)
+    .split(" ")
+    .filter((t) => t.length > 2 && !GENERIC_TOKENS.has(t));
+}
 
 function safeParseStore(raw: string | null): CategoryLearningStore {
   if (!raw) return {};
@@ -137,8 +254,62 @@ export function writeLearningStore(store: CategoryLearningStore): void {
 }
 
 export function buildLearningKey(description: string, value: number): string {
-  const desc = description.toLowerCase().trim().substring(0, 50);
-  return `${desc}-${Math.round(value)}`;
+  const norm = normalizeText(description).substring(0, 50);
+  return `${norm}-${Math.round(value)}`;
+}
+
+export interface SuggestionResult {
+  category: string | null;
+  confidence: SuggestionConfidence;
+  score: number;
+}
+
+const SCORE_THRESHOLD = 0.4;
+
+export function suggestCategoryDetailed(
+  description: string,
+  value: number,
+  store?: CategoryLearningStore,
+): SuggestionResult {
+  const data = store ?? readLearningStore();
+  const exactKey = buildLearningKey(description, value);
+
+  // 1) match exato → alta confiança
+  if (data[exactKey]) {
+    return { category: data[exactKey].category, confidence: "alta", score: 1 };
+  }
+
+  const queryTokens = tokenize(description);
+  if (queryTokens.length === 0) {
+    return { category: null, confidence: null, score: 0 };
+  }
+  const querySet = new Set(queryTokens);
+
+  let best: { entry: CategoryLearning; score: number } | null = null;
+
+  for (const entry of Object.values(data)) {
+    const learnedTokens = entry.tokens && entry.tokens.length > 0 ? entry.tokens : [];
+    if (learnedTokens.length === 0) continue;
+    const learnedSet = new Set(learnedTokens);
+    let intersection = 0;
+    for (const t of learnedSet) if (querySet.has(t)) intersection++;
+    const unionSize = new Set([...querySet, ...learnedSet]).size;
+    if (unionSize === 0) continue;
+    const jaccard = intersection / unionSize;
+    // raiz do estabelecimento: primeiros tokens
+    const rootMatch =
+      learnedTokens[0] && queryTokens[0] && learnedTokens[0] === queryTokens[0] ? 0.15 : 0;
+    const combined = (jaccard + rootMatch) * Math.log2(1 + entry.frequency);
+    if (!best || combined > best.score) {
+      best = { entry, score: combined };
+    }
+  }
+
+  if (!best || best.score < SCORE_THRESHOLD) {
+    return { category: null, confidence: null, score: best?.score ?? 0 };
+  }
+  const confidence: SuggestionConfidence = best.score >= 1 ? "alta" : best.score >= 0.7 ? "media" : "baixa";
+  return { category: best.entry.category, confidence, score: best.score };
 }
 
 export function suggestCategory(
@@ -146,23 +317,7 @@ export function suggestCategory(
   value: number,
   store?: CategoryLearningStore,
 ): string | null {
-  const data = store ?? readLearningStore();
-  const key = buildLearningKey(description, value);
-
-  // 1. exact key match
-  if (data[key]) return data[key].category;
-
-  // 2. prefix / fuzzy match — keep the highest frequency
-  const descPrefix = description.toLowerCase().trim().substring(0, 20);
-  if (!descPrefix) return null;
-
-  let best: CategoryLearning | null = null;
-  for (const [k, entry] of Object.entries(data)) {
-    if (k.startsWith(descPrefix) || descPrefix.startsWith(k.split("-")[0] ?? "")) {
-      if (!best || entry.frequency > best.frequency) best = entry;
-    }
-  }
-  return best?.category ?? null;
+  return suggestCategoryDetailed(description, value, store).category;
 }
 
 export function learnCategory(
@@ -173,53 +328,67 @@ export function learnCategory(
   const store = readLearningStore();
   const key = buildLearningKey(description, value);
   const existing = store[key];
+  const tokens = tokenize(description);
   const next: CategoryLearning = {
     category,
     frequency:
-      existing && existing.category === category ? existing.frequency + 1 : (existing?.frequency ?? 0) + 1,
+      existing && existing.category === category
+        ? existing.frequency + 1
+        : (existing?.frequency ?? 0) + 1,
     lastUpdated: new Date().toISOString(),
+    tokens,
   };
   store[key] = next;
   writeLearningStore(store);
   return store;
 }
 
-// ---------- Pipeline helpers ----------
+// ---------- Pipeline ----------
+
+function newProcessedLine(
+  line: InvoiceLine,
+  overrides: Partial<ProcessedInvoiceLine>,
+): ProcessedInvoiceLine {
+  const purchaseDate = extractPurchaseDate(line.description, line.date);
+  return {
+    id: line.id ? `${line.id}` : crypto.randomUUID(),
+    originalId: line.id,
+    description: line.description,
+    value: line.value,
+    originalDate: line.date,
+    purchaseDate,
+    dueDate: purchaseDate ?? line.date,
+    isParcel: null,
+    paymentType: "normal",
+    isDuplicate: false,
+    suggestedCategory: null,
+    suggestionConfidence: null,
+    appliedCategory: null,
+    filterReason: null,
+    ...overrides,
+  };
+}
 
 export function expandParcels(lines: InvoiceLine[]): ProcessedInvoiceLine[] {
   const out: ProcessedInvoiceLine[] = [];
   for (const line of lines) {
     const parcel = detectParcel(line.description);
     if (!parcel) {
-      out.push({
-        id: line.id ? `${line.id}` : crypto.randomUUID(),
-        originalId: line.id,
-        description: line.description,
-        value: line.value,
-        originalDate: line.date,
-        dueDate: line.date,
-        isParcel: null,
-        paymentType: "normal",
-        isDuplicate: false,
-        suggestedCategory: null,
-        appliedCategory: null,
-      });
+      out.push(newProcessedLine(line, {}));
       continue;
     }
+    const purchaseDate = extractPurchaseDate(line.description, line.date);
+    const base = purchaseDate ?? line.date;
     for (let i = parcel.current; i <= parcel.total; i++) {
-      out.push({
-        id: `${line.id ?? crypto.randomUUID()}-p${i}`,
-        originalId: line.id,
-        description: line.description,
-        value: line.value,
-        originalDate: line.date,
-        dueDate: calculateDueDate(line.date, i - parcel.current + 1),
-        isParcel: { current: i, total: parcel.total },
-        paymentType: "normal",
-        isDuplicate: false,
-        suggestedCategory: null,
-        appliedCategory: null,
-      });
+      const offset = i - parcel.current + 1;
+      out.push(
+        newProcessedLine(line, {
+          id: `${line.id ?? crypto.randomUUID()}-p${i}`,
+          purchaseDate,
+          dueDate: calculateDueDate(base, offset),
+          isParcel: { current: i, total: parcel.total },
+        }),
+      );
     }
   }
   return out;
@@ -230,8 +399,8 @@ export function applySuggestions(
   store?: CategoryLearningStore,
 ): ProcessedInvoiceLine[] {
   const data = store ?? readLearningStore();
-  return lines.map((l) => ({
-    ...l,
-    suggestedCategory: suggestCategory(l.description, l.value, data),
-  }));
+  return lines.map((l) => {
+    const res = suggestCategoryDetailed(l.description, l.value, data);
+    return { ...l, suggestedCategory: res.category, suggestionConfidence: res.confidence };
+  });
 }

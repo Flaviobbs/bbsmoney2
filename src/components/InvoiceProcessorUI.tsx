@@ -18,21 +18,41 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Wand2, AlertCircle } from "lucide-react";
+import { Loader2, Wand2, AlertCircle, RotateCcw, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { useInvoiceProcessing } from "@/hooks/useInvoiceProcessing";
-import type { InvoiceLine, ProcessedInvoiceLine } from "@/types/ProcessedInvoice";
+import type {
+  FilterReason,
+  InvoiceLine,
+  ProcessedInvoiceLine,
+} from "@/types/ProcessedInvoice";
 
 interface Props {
   invoiceLines: InvoiceLine[];
   onProcessed?: (processed: ProcessedInvoiceLine[]) => void;
 }
 
+const FILTER_REASON_LABEL: Record<Exclude<FilterReason, null>, string> = {
+  valor_negativo: "Valor negativo",
+  pagamento_detectado: "Pagamento",
+  credito: "Crédito",
+  estorno: "Estorno",
+};
+
 export function InvoiceProcessorUI({ invoiceLines, onProcessed }: Props) {
-  const { processed, filteredPayments, loading, error, process, applyCategory } =
-    useInvoiceProcessing();
+  const {
+    processed,
+    filteredPayments,
+    loading,
+    error,
+    summary,
+    process,
+    applyCategory,
+    restoreFiltered,
+  } = useInvoiceProcessing();
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [showFiltered, setShowFiltered] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -61,11 +81,14 @@ export function InvoiceProcessorUI({ invoiceLines, onProcessed }: Props) {
     }
   };
 
-  const stats = useMemo(() => {
-    const dups = processed.filter((p) => p.isDuplicate).length;
-    const parcels = processed.filter((p) => p.isParcel).length;
-    return { dups, parcels, filtered: filteredPayments.length, total: processed.length };
-  }, [processed, filteredPayments]);
+  const confidenceVariant = useMemo(
+    () => ({
+      alta: "default" as const,
+      media: "secondary" as const,
+      baixa: "outline" as const,
+    }),
+    [],
+  );
 
   return (
     <Card>
@@ -94,12 +117,13 @@ export function InvoiceProcessorUI({ invoiceLines, onProcessed }: Props) {
           </div>
         )}
 
-        {processed.length > 0 && (
+        {(processed.length > 0 || filteredPayments.length > 0) && (
           <div className="flex flex-wrap gap-2 text-xs">
-            <Badge variant="secondary">Total: {stats.total}</Badge>
-            <Badge variant="secondary">Parcelas: {stats.parcels}</Badge>
-            <Badge variant="secondary">Duplicatas: {stats.dups}</Badge>
-            <Badge variant="secondary">Pagamentos filtrados: {stats.filtered}</Badge>
+            <Badge variant="secondary">Total no PDF: {summary.totalInput}</Badge>
+            <Badge variant="default">Importadas: {summary.imported}</Badge>
+            <Badge variant="outline">Parcelas: {summary.parcelsExpanded}</Badge>
+            <Badge variant="destructive">Duplicatas: {summary.duplicates}</Badge>
+            <Badge variant="secondary">Filtradas: {summary.filtered}</Badge>
           </div>
         )}
 
@@ -110,7 +134,8 @@ export function InvoiceProcessorUI({ invoiceLines, onProcessed }: Props) {
                 <TableRow>
                   <TableHead>Descrição</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
-                  <TableHead>Data</TableHead>
+                  <TableHead>Compra</TableHead>
+                  <TableHead>Vencimento</TableHead>
                   <TableHead>Parcela</TableHead>
                   <TableHead>Categoria</TableHead>
                   <TableHead>Status</TableHead>
@@ -126,12 +151,15 @@ export function InvoiceProcessorUI({ invoiceLines, onProcessed }: Props) {
                       {formatCurrency(line.value)}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {line.purchaseDate ? formatDate(line.purchaseDate) : "—"}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
                       {line.dueDate ? formatDate(line.dueDate) : "—"}
                     </TableCell>
                     <TableCell>
                       {line.isParcel ? (
                         <Badge variant="outline">
-                          {line.isParcel.current}/{line.isParcel.total}
+                          Parcela {line.isParcel.current}/{line.isParcel.total}
                         </Badge>
                       ) : (
                         <span className="text-muted-foreground">—</span>
@@ -166,9 +194,12 @@ export function InvoiceProcessorUI({ invoiceLines, onProcessed }: Props) {
                             Aplicada
                           </Badge>
                         )}
-                        {!line.appliedCategory && line.suggestedCategory && (
-                          <Badge variant="outline" className="text-[10px]">
-                            Sugerida
+                        {!line.appliedCategory && line.suggestedCategory && line.suggestionConfidence && (
+                          <Badge
+                            variant={confidenceVariant[line.suggestionConfidence]}
+                            className="text-[10px]"
+                          >
+                            Sugestão ({line.suggestionConfidence})
                           </Badge>
                         )}
                       </div>
@@ -181,15 +212,41 @@ export function InvoiceProcessorUI({ invoiceLines, onProcessed }: Props) {
         )}
 
         {filteredPayments.length > 0 && (
-          <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
-            <div className="mb-1 font-semibold">Pagamentos de fatura filtrados:</div>
-            <ul className="list-inside list-disc space-y-0.5">
-              {filteredPayments.map((p, i) => (
-                <li key={i}>
-                  {p.description} — {formatCurrency(p.value)}
-                </li>
-              ))}
-            </ul>
+          <div className="rounded-lg border bg-muted/30 p-3 text-xs">
+            <button
+              type="button"
+              onClick={() => setShowFiltered((v) => !v)}
+              className="flex w-full items-center justify-between font-semibold text-muted-foreground hover:text-foreground"
+            >
+              <span>{filteredPayments.length} linha(s) ignorada(s) (pagamentos/créditos)</span>
+              {showFiltered ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            </button>
+            {showFiltered && (
+              <ul className="mt-2 space-y-1">
+                {filteredPayments.map((p, i) => (
+                  <li
+                    key={`${p.description}-${i}`}
+                    className="flex items-center justify-between gap-2 rounded border bg-background p-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate">{p.description}</div>
+                      <div className="text-muted-foreground">
+                        {formatCurrency(p.value)} ·{" "}
+                        <span className="font-medium">{FILTER_REASON_LABEL[p.filterReason]}</span>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => restoreFiltered(i)}
+                      title="Restaurar esta linha"
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
       </CardContent>
