@@ -113,13 +113,8 @@ export function calculateDueDate(originalDate: string, parcelIndex: number): str
 const DATE_DDMMYYYY = /\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/;
 const DATE_DDMM = /\b(\d{1,2})[\/\-.](\d{1,2})\b/;
 
-function stripParcel(description: string): string {
-  let out = description;
-  for (const re of PARCEL_REGEXES) {
-    out = out.replace(re, " ");
-  }
-  return out;
-}
+const DATE_DDMMYYYY = /\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/g;
+const DATE_DDMM = /\b(\d{1,2})[\/\-.](\d{1,2})\b/g;
 
 export function extractPurchaseDate(
   description: string,
@@ -127,32 +122,32 @@ export function extractPurchaseDate(
 ): string | null {
   if (!description) return fallbackDate || null;
   try {
-    description = stripParcel(description);
     const fallback = parseISO(fallbackDate);
     if (!isValid(fallback)) return null;
 
-    const full = description.match(DATE_DDMMYYYY);
-    if (full) {
-      const day = parseInt(full[1], 10);
-      const month = parseInt(full[2], 10);
-      let year = parseInt(full[3], 10);
+    // 1) data completa dd/mm/yyyy
+    for (const m of description.matchAll(DATE_DDMMYYYY)) {
+      const day = parseInt(m[1], 10);
+      const month = parseInt(m[2], 10);
+      let year = parseInt(m[3], 10);
       if (year < 100) year += 2000;
-      if (isValidDateParts(year, month, day)) {
+      if (month >= 1 && month <= 12 && isValidDateParts(year, month, day)) {
         return format(new Date(year, month - 1, day), "yyyy-MM-dd");
       }
     }
 
-    const partial = description.match(DATE_DDMM);
-    if (partial) {
-      const day = parseInt(partial[1], 10);
-      const month = parseInt(partial[2], 10);
-      if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-        let year = fallback.getFullYear();
-        // Se o mês detectado é depois do mês do extrato, provavelmente é do ano anterior
-        if (month > fallback.getMonth() + 1) year -= 1;
-        if (isValidDateParts(year, month, day)) {
-          return format(new Date(year, month - 1, day), "yyyy-MM-dd");
-        }
+    // 2) data parcial dd/mm — para evitar colisão com indicador de parcela ("1/3"),
+    // só consideramos quando day > 12 OU month > 12 (inequívoco), e month ∈ [1..12]
+    for (const m of description.matchAll(DATE_DDMM)) {
+      const day = parseInt(m[1], 10);
+      const month = parseInt(m[2], 10);
+      if (month < 1 || month > 12) continue;
+      if (day <= 12 && month <= 12) continue; // ambíguo com parcela — descartar
+      if (day < 1 || day > 31) continue;
+      let year = fallback.getFullYear();
+      if (month > fallback.getMonth() + 1) year -= 1;
+      if (isValidDateParts(year, month, day)) {
+        return format(new Date(year, month - 1, day), "yyyy-MM-dd");
       }
     }
 
