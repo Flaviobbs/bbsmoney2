@@ -70,12 +70,43 @@ describe("detectParcel", () => {
   it("detects 'PCL 3/12'", () => {
     expect(detectParcel("Loja PCL 3/12")).toEqual({ current: 3, total: 12 });
   });
+  it("detects 'PCL 3/12'", () => {
+    expect(detectParcel("Loja PCL 3/12")).toEqual({ current: 3, total: 12 });
+  });
+  it("detects brackets '[2/6]'", () => {
+    expect(detectParcel("Curso [2/6]")).toEqual({ current: 2, total: 6 });
+  });
+  it("detects braces '{4/8}'", () => {
+    expect(detectParcel("Item {4/8}")).toEqual({ current: 4, total: 8 });
+  });
+  it("detects 'parcelado em 3/10'", () => {
+    expect(detectParcel("TV parcelado em 3/10")).toEqual({ current: 3, total: 10 });
+  });
+  it("detects 'parcelado em 3x10'", () => {
+    expect(detectParcel("TV parcelado em 3x10")).toEqual({ current: 3, total: 10 });
+  });
+  it("detects 'PARC 02.06' with dot separator", () => {
+    expect(detectParcel("Magazine PARC 02.06")).toEqual({ current: 2, total: 6 });
+  });
+  it("detects 'PARC 02-06' with dash separator", () => {
+    expect(detectParcel("Magazine PARC 02-06")).toEqual({ current: 2, total: 6 });
+  });
+  it("detects '1ª de 10' (feminine ordinal)", () => {
+    expect(detectParcel("Curso 1ª de 10")).toEqual({ current: 1, total: 10 });
+  });
+  it("detects English '2 of 12'", () => {
+    expect(detectParcel("Item 2 of 12")).toEqual({ current: 2, total: 12 });
+  });
+  it("detects 'P 3/10'", () => {
+    expect(detectParcel("Loja P 3/10")).toEqual({ current: 3, total: 10 });
+  });
   it("rejects when current > total", () => {
     expect(detectParcel("Compra 11/10")).toBeNull();
   });
   it("returns null when no parcel info", () => {
     expect(detectParcel("Padaria do João")).toBeNull();
   });
+
 });
 
 describe("calculateDueDate", () => {
