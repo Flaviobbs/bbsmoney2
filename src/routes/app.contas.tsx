@@ -153,7 +153,11 @@ function BillsPage() {
 
   const reopen = async (bill: Bill) => {
     if (bill.paid_transaction_id) {
-      await supabase.from("transactions").delete().eq("id", bill.paid_transaction_id);
+      const { error: delErr } = await supabase
+        .from("transactions")
+        .delete()
+        .eq("id", bill.paid_transaction_id);
+      if (delErr) return toast.error(delErr.message);
     }
     const { error } = await supabase
       .from("bills")
