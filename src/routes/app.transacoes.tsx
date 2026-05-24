@@ -517,10 +517,12 @@ function EditCategoryDialog({
 }
 
 function TransactionDialog({
+  open,
   cats,
   accs,
   onSaved,
 }: {
+  open: boolean;
   cats: Cat[];
   accs: Acc[];
   onSaved: () => void;
@@ -536,6 +538,18 @@ function TransactionDialog({
   useEffect(() => {
     if (!accountId && accs[0]) setAccountId(accs[0].id);
   }, [accs, accountId]);
+
+  useEffect(() => {
+    if (!open) {
+      setAmount("");
+      setDescription("");
+      setDate(todayISO());
+      setType("expense");
+      setCategoryId("");
+      setAccountId(accs[0]?.id ?? "");
+    }
+  }, [open, accs]);
+
 
   const filteredCats = cats.filter((c) => c.type === type);
 
