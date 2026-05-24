@@ -164,6 +164,7 @@ function TransactionsPage() {
             </Button>
           </DialogTrigger>
           <TransactionDialog
+            open={open}
             cats={cats}
             accs={accs}
             onSaved={() => {
