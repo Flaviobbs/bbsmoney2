@@ -129,6 +129,13 @@ export function extractPurchaseDate(
   try {
     const fallback = parseISO(fallbackDate);
     if (!isValid(fallback)) return null;
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    const isPastOrToday = (y: number, m: number, d: number) => {
+      const dt = new Date(y, m - 1, d);
+      return dt.getTime() <= today.getTime();
+    };
 
     // 1) data completa dd/mm/yyyy
     for (const m of description.matchAll(DATE_DDMMYYYY)) {
@@ -136,26 +143,36 @@ export function extractPurchaseDate(
       const month = parseInt(m[2], 10);
       let year = parseInt(m[3], 10);
       if (year < 100) year += 2000;
-      if (month >= 1 && month <= 12 && isValidDateParts(year, month, day)) {
+      if (
+        month >= 1 && month <= 12 &&
+        isValidDateParts(year, month, day) &&
+        isPastOrToday(year, month, day)
+      ) {
         return format(new Date(year, month - 1, day), "yyyy-MM-dd");
       }
     }
 
-    // 2) data parcial dd/mm — para evitar colisão com indicador de parcela ("1/3"),
-    // só consideramos quando day > 12 OU month > 12 (inequívoco), e month ∈ [1..12]
+    // 2) data parcial dd/mm — evita colisão com indicador de parcela ("1/3")
     for (const m of description.matchAll(DATE_DDMM)) {
       const day = parseInt(m[1], 10);
       const month = parseInt(m[2], 10);
       if (month < 1 || month > 12) continue;
-      if (day <= 12 && month <= 12) continue; // ambíguo com parcela — descartar
+      if (day <= 12 && month <= 12) continue;
       if (day < 1 || day > 31) continue;
       let year = fallback.getFullYear();
       if (month > fallback.getMonth() + 1) year -= 1;
-      if (isValidDateParts(year, month, day)) {
+      if (!isValidDateParts(year, month, day)) continue;
+      // se cair no futuro, recua 1 ano
+      if (!isPastOrToday(year, month, day)) year -= 1;
+      if (isValidDateParts(year, month, day) && isPastOrToday(year, month, day)) {
         return format(new Date(year, month - 1, day), "yyyy-MM-dd");
       }
     }
 
+    // fallback nunca pode estar no futuro
+    if (fallback.getTime() > today.getTime()) {
+      return format(today, "yyyy-MM-dd");
+    }
     return fallbackDate;
   } catch (err) {
     console.error("[invoiceProcessor] extractPurchaseDate error", err);
