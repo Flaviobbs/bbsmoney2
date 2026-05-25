@@ -198,23 +198,21 @@ describe("deduplicate", () => {
 });
 
 describe("expandParcels", () => {
-  it("expands a 3-parcel line into 3 entries with sequential dates from purchase date", () => {
+  it("emits only the current parcel dated as the invoice month", () => {
     const out = expandParcels([
       { description: "TV Parcelado 1/3 15/01", value: 300, date: "2026-01-20" },
     ]);
-    expect(out).toHaveLength(3);
-    expect(out[0].dueDate).toBe("2026-01-15");
-    expect(out[1].dueDate).toBe("2026-02-15");
-    expect(out[2].dueDate).toBe("2026-03-15");
+    expect(out).toHaveLength(1);
+    expect(out[0].isParcel).toEqual({ current: 1, total: 3 });
+    expect(out[0].dueDate).toBe("2026-01-20");
   });
-  it("uses fatura date when no date in description", () => {
+  it("uses invoice date for parcel payment month (no future expansion)", () => {
     const out = expandParcels([
       { description: "Loja 3/10", value: 100, date: "2026-05-10" },
     ]);
-    // parcela 3 → offset 1 → mesma data de compra
+    expect(out).toHaveLength(1);
     expect(out[0].isParcel).toEqual({ current: 3, total: 10 });
     expect(out[0].dueDate).toBe("2026-05-10");
-    expect(out[1].dueDate).toBe("2026-06-10");
   });
   it("keeps single-line entries unchanged", () => {
     const out = expandParcels([
