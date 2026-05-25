@@ -138,17 +138,30 @@ function TransactionsPage() {
   });
 
   const groups = useMemo(() => {
-    const map = new Map<string, { items: Tx[]; income: number; expense: number }>();
+    const map = new Map<
+      string,
+      { categoryId: string | null; name: string; color: string; items: Tx[]; income: number; expense: number }
+    >();
     for (const t of filtered) {
-      const key = t.date.slice(0, 7);
-      if (!map.has(key)) map.set(key, { items: [], income: 0, expense: 0 });
+      const cat = cats.find((c) => c.id === t.category_id);
+      const key = t.category_id ?? "__none__";
+      const name = cat ? catFullName(cat, cats) : "Sem categoria";
+      const color = cat?.color ?? "#64748b";
+      if (!map.has(key)) {
+        map.set(key, { categoryId: t.category_id, name, color, items: [], income: 0, expense: 0 });
+      }
       const g = map.get(key)!;
       g.items.push(t);
       if (t.type === "income") g.income += Number(t.amount);
       else g.expense += Number(t.amount);
     }
-    return Array.from(map.entries()).sort((a, b) => (a[0] < b[0] ? 1 : -1));
-  }, [filtered]);
+    // ordena por valor total (desc) — categorias com maior movimento primeiro
+    return Array.from(map.entries()).sort((a, b) => {
+      const aTotal = a[1].income + a[1].expense;
+      const bTotal = b[1].income + b[1].expense;
+      return bTotal - aTotal;
+    });
+  }, [filtered, cats]);
 
   return (
     <div className="space-y-6">
