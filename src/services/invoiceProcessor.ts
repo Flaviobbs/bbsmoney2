@@ -1,4 +1,5 @@
-import { addMonths, format, isValid, parseISO, setYear } from "date-fns";
+import { addMonths, format, isValid, parseISO } from "date-fns";
+import { suggestCategoryByKeyword } from "./merchantKeywords";
 import type {
   CategoryLearning,
   CategoryLearningStore,
@@ -19,10 +20,15 @@ const PAYMENT_PATTERNS: Array<{ regex: RegExp; reason: "pagamento_detectado" | "
   { regex: /pagamento\s*(de\s*)?fatura/i, reason: "pagamento_detectado" },
   { regex: /pag(to|amento)/i, reason: "pagamento_detectado" },
   { regex: /deb\s*autom|d[eé]bito\s*autom[aá]tico/i, reason: "pagamento_detectado" },
-  { regex: /saldo\s*anterior/i, reason: "pagamento_detectado" },
+  { regex: /saldo\s*(anterior|atual|disponivel|dispon[ií]vel)/i, reason: "pagamento_detectado" },
+  { regex: /\bajuste\b/i, reason: "pagamento_detectado" },
+  { regex: /valor\s*recebido/i, reason: "credito" },
   { regex: /estorno/i, reason: "estorno" },
   { regex: /devolu[cç][aã]o/i, reason: "estorno" },
-  { regex: /cr[eé]dito/i, reason: "credito" },
+  { regex: /cancelamento\s*compra/i, reason: "estorno" },
+  { regex: /\bcr[eé]dito\b(?!\s*card|\s*cart)/i, reason: "credito" }, // evita matar "cartão crédito"
+  { regex: /cashback/i, reason: "credito" },
+  { regex: /bonifica[cç][aã]o/i, reason: "credito" },
 ];
 
 export function detectPaymentReason(description: string): "pagamento_detectado" | "credito" | "estorno" | null {
@@ -276,42 +282,47 @@ export function suggestCategoryDetailed(
   const data = store ?? readLearningStore();
   const exactKey = buildLearningKey(description, value);
 
-  // 1) match exato → alta confiança
+  // 1) match exato no aprendizado → alta confiança
   if (data[exactKey]) {
     return { category: data[exactKey].category, confidence: "alta", score: 1 };
   }
 
   const queryTokens = tokenize(description);
-  if (queryTokens.length === 0) {
-    return { category: null, confidence: null, score: 0 };
-  }
   const querySet = new Set(queryTokens);
 
+  // 2) match por token nas regras aprendidas
   let best: { entry: CategoryLearning; score: number } | null = null;
-
-  for (const entry of Object.values(data)) {
-    const learnedTokens = entry.tokens && entry.tokens.length > 0 ? entry.tokens : [];
-    if (learnedTokens.length === 0) continue;
-    const learnedSet = new Set(learnedTokens);
-    let intersection = 0;
-    for (const t of learnedSet) if (querySet.has(t)) intersection++;
-    const unionSize = new Set([...querySet, ...learnedSet]).size;
-    if (unionSize === 0) continue;
-    const jaccard = intersection / unionSize;
-    // raiz do estabelecimento: primeiros tokens
-    const rootMatch =
-      learnedTokens[0] && queryTokens[0] && learnedTokens[0] === queryTokens[0] ? 0.15 : 0;
-    const combined = (jaccard + rootMatch) * Math.log2(1 + entry.frequency);
-    if (!best || combined > best.score) {
-      best = { entry, score: combined };
+  if (queryTokens.length > 0) {
+    for (const entry of Object.values(data)) {
+      const learnedTokens = entry.tokens && entry.tokens.length > 0 ? entry.tokens : [];
+      if (learnedTokens.length === 0) continue;
+      const learnedSet = new Set(learnedTokens);
+      let intersection = 0;
+      for (const t of learnedSet) if (querySet.has(t)) intersection++;
+      const unionSize = new Set([...querySet, ...learnedSet]).size;
+      if (unionSize === 0) continue;
+      const jaccard = intersection / unionSize;
+      const rootMatch =
+        learnedTokens[0] && queryTokens[0] && learnedTokens[0] === queryTokens[0] ? 0.15 : 0;
+      const combined = (jaccard + rootMatch) * Math.log2(1 + entry.frequency);
+      if (!best || combined > best.score) {
+        best = { entry, score: combined };
+      }
     }
   }
 
-  if (!best || best.score < SCORE_THRESHOLD) {
-    return { category: null, confidence: null, score: best?.score ?? 0 };
+  if (best && best.score >= SCORE_THRESHOLD) {
+    const confidence: SuggestionConfidence = best.score >= 1 ? "alta" : best.score >= 0.7 ? "media" : "baixa";
+    return { category: best.entry.category, confidence, score: best.score };
   }
-  const confidence: SuggestionConfidence = best.score >= 1 ? "alta" : best.score >= 0.7 ? "media" : "baixa";
-  return { category: best.entry.category, confidence, score: best.score };
+
+  // 3) fallback: catálogo de keywords de comerciantes conhecidos
+  const keywordCategory = suggestCategoryByKeyword(description);
+  if (keywordCategory) {
+    return { category: keywordCategory, confidence: "media", score: 0.6 };
+  }
+
+  return { category: null, confidence: null, score: best?.score ?? 0 };
 }
 
 export function suggestCategory(
