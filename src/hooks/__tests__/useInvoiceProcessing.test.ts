@@ -242,8 +242,13 @@ describe("category learning", () => {
     window.localStorage.removeItem(LEARNING_STORAGE_KEY);
   });
 
-  it("returns null when store empty", () => {
-    expect(suggestCategory("Padaria", 10)).toBeNull();
+  it("returns null when store empty and no keyword match", () => {
+    expect(suggestCategory("XYZ ABC 999", 10)).toBeNull();
+  });
+  it("uses merchant keyword catalog as fallback", () => {
+    expect(suggestCategory("IFOOD*RESTAURANTE", 25)).toBe("Alimentação");
+    expect(suggestCategory("UBER *TRIP", 18)).toBe("Transporte");
+    expect(suggestCategory("NETFLIX.COM", 39)).toBe("Assinaturas");
   });
   it("learns and suggests by exact key with high confidence", () => {
     learnCategory("Padaria Central", 10, "Alimentação");
