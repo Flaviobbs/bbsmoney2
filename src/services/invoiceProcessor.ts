@@ -269,6 +269,7 @@ export function buildLearningKey(description: string, value: number): string {
 export interface SuggestionResult {
   category: string | null;
   confidence: SuggestionConfidence;
+  source: "aprendizado" | "keyword" | null;
   score: number;
 }
 
@@ -284,7 +285,7 @@ export function suggestCategoryDetailed(
 
   // 1) match exato no aprendizado → alta confiança
   if (data[exactKey]) {
-    return { category: data[exactKey].category, confidence: "alta", score: 1 };
+    return { category: data[exactKey].category, confidence: "alta", source: "aprendizado", score: 1 };
   }
 
   const queryTokens = tokenize(description);
@@ -313,16 +314,16 @@ export function suggestCategoryDetailed(
 
   if (best && best.score >= SCORE_THRESHOLD) {
     const confidence: SuggestionConfidence = best.score >= 1 ? "alta" : best.score >= 0.7 ? "media" : "baixa";
-    return { category: best.entry.category, confidence, score: best.score };
+    return { category: best.entry.category, confidence, source: "aprendizado", score: best.score };
   }
 
   // 3) fallback: catálogo de keywords de comerciantes conhecidos
   const keywordCategory = suggestCategoryByKeyword(description);
   if (keywordCategory) {
-    return { category: keywordCategory, confidence: "media", score: 0.6 };
+    return { category: keywordCategory, confidence: "media", source: "keyword", score: 0.6 };
   }
 
-  return { category: null, confidence: null, score: best?.score ?? 0 };
+  return { category: null, confidence: null, source: null, score: best?.score ?? 0 };
 }
 
 export function suggestCategory(
