@@ -167,6 +167,15 @@ export const Route = createFileRoute("/api/documents/process")({
             .update({ status: "processed", processed_at: new Date().toISOString() })
             .eq("id", doc.id);
 
+          // Auditoria: registra ingestão bem-sucedida em ingestion_logs
+          await supabase.from("ingestion_logs").insert({
+            user_id: userId,
+            source: "pdf_upload",
+            input_payload: { document_id: doc.id, file_name: doc.file_name, text_length: rawText.length },
+            output_payload: { suggestion_count: suggestions.length },
+            status: "ok",
+          });
+
           return Response.json({ suggestions });
         } catch (e) {
           const msg = e instanceof Error ? e.message : "Erro";
@@ -180,6 +189,14 @@ export const Route = createFileRoute("/api/documents/process")({
             status: "failed",
             error_message: msg,
             suggestions: [],
+          });
+          // Auditoria: registra falha em ingestion_logs
+          await supabase.from("ingestion_logs").insert({
+            user_id: userId,
+            source: "pdf_upload",
+            input_payload: { document_id: doc.id, file_name: doc.file_name },
+            status: "error",
+            error_message: msg,
           });
           return Response.json({ error: msg }, { status: 500 });
         }
