@@ -45,6 +45,7 @@ function mkProc(over: Partial<ProcessedInvoiceLine>): ProcessedInvoiceLine {
     isDuplicate: false,
     suggestedCategory: null,
     suggestionConfidence: null,
+    suggestionSource: null,
     appliedCategory: null,
     filterReason: null,
     ...over,
