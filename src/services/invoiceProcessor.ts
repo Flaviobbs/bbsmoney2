@@ -19,10 +19,15 @@ const PAYMENT_PATTERNS: Array<{ regex: RegExp; reason: "pagamento_detectado" | "
   { regex: /pagamento\s*(de\s*)?fatura/i, reason: "pagamento_detectado" },
   { regex: /pag(to|amento)/i, reason: "pagamento_detectado" },
   { regex: /deb\s*autom|d[eé]bito\s*autom[aá]tico/i, reason: "pagamento_detectado" },
-  { regex: /saldo\s*anterior/i, reason: "pagamento_detectado" },
+  { regex: /saldo\s*(anterior|atual|disponivel|dispon[ií]vel)/i, reason: "pagamento_detectado" },
+  { regex: /\bajuste\b/i, reason: "pagamento_detectado" },
+  { regex: /valor\s*recebido/i, reason: "credito" },
   { regex: /estorno/i, reason: "estorno" },
   { regex: /devolu[cç][aã]o/i, reason: "estorno" },
-  { regex: /cr[eé]dito/i, reason: "credito" },
+  { regex: /cancelamento\s*compra/i, reason: "estorno" },
+  { regex: /\bcr[eé]dito\b(?!\s*card|\s*cart)/i, reason: "credito" }, // evita matar "cartão crédito"
+  { regex: /cashback/i, reason: "credito" },
+  { regex: /bonifica[cç][aã]o/i, reason: "credito" },
 ];
 
 export function detectPaymentReason(description: string): "pagamento_detectado" | "credito" | "estorno" | null {
