@@ -377,12 +377,18 @@ function newProcessedLine(
     isDuplicate: false,
     suggestedCategory: null,
     suggestionConfidence: null,
+    suggestionSource: null,
     appliedCategory: null,
     filterReason: null,
     ...overrides,
   };
 }
 
+/**
+ * Para parcelados em fatura, geramos APENAS a parcela do mês atual de pagamento.
+ * Não criamos lançamentos futuros — eles aparecerão em faturas futuras.
+ * A data do lançamento é a data da fatura (mês de pagamento), não a data da compra original.
+ */
 export function expandParcels(lines: InvoiceLine[]): ProcessedInvoiceLine[] {
   const out: ProcessedInvoiceLine[] = [];
   for (const line of lines) {
@@ -392,18 +398,15 @@ export function expandParcels(lines: InvoiceLine[]): ProcessedInvoiceLine[] {
       continue;
     }
     const purchaseDate = extractPurchaseDate(line.description, line.date);
-    const base = purchaseDate ?? line.date;
-    for (let i = parcel.current; i <= parcel.total; i++) {
-      const offset = i - parcel.current + 1;
-      out.push(
-        newProcessedLine(line, {
-          id: `${line.id ?? crypto.randomUUID()}-p${i}`,
-          purchaseDate,
-          dueDate: calculateDueDate(base, offset),
-          isParcel: { current: i, total: parcel.total },
-        }),
-      );
-    }
+    out.push(
+      newProcessedLine(line, {
+        id: `${line.id ?? crypto.randomUUID()}-p${parcel.current}`,
+        purchaseDate,
+        // mês de pagamento da parcela = data da fatura
+        dueDate: line.date,
+        isParcel: { current: parcel.current, total: parcel.total },
+      }),
+    );
   }
   return out;
 }
@@ -415,6 +418,11 @@ export function applySuggestions(
   const data = store ?? readLearningStore();
   return lines.map((l) => {
     const res = suggestCategoryDetailed(l.description, l.value, data);
-    return { ...l, suggestedCategory: res.category, suggestionConfidence: res.confidence };
+    return {
+      ...l,
+      suggestedCategory: res.category,
+      suggestionConfidence: res.confidence,
+      suggestionSource: res.source,
+    };
   });
 }
