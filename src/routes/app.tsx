@@ -9,22 +9,11 @@ export const Route = createFileRoute("/app")({
 });
 
 function AppLayout() {
-  const { session, loading } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!loading && !session) {
-      navigate({ to: "/login" });
-    }
-  }, [loading, session, navigate]);
-
-  if (loading || !session) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-sm text-muted-foreground">Carregando...</div>
-      </div>
-    );
-  }
+  // ⚠️ LOGIN TEMPORARIAMENTE DESABILITADO PARA TESTES
+  // Para reativar, restaurar o bloco com useAuth + redirect para /login.
+  useAuth();
+  void useNavigate;
+  void useEffect;
 
   return (
     <SidebarProvider>
