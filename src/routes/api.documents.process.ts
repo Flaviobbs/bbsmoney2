@@ -30,12 +30,8 @@ export const Route = createFileRoute("/api/documents/process")({
         const body = (await request.json()) as { document_id?: string; password?: string };
         if (!body.document_id) return Response.json({ error: "document_id obrigatório" }, { status: 400 });
 
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("pdf_password")
-          .eq("id", userId)
-          .maybeSingle();
-        const password = body.password ?? profile?.pdf_password ?? undefined;
+        const { data: pwdRpc } = await supabase.rpc("get_pdf_password");
+        const password = body.password ?? (pwdRpc as string | null) ?? undefined;
 
         const { data: doc, error: docErr } = await supabase
           .from("documents")
