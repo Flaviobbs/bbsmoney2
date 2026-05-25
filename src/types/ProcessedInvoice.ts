@@ -27,6 +27,8 @@ export interface FilteredInvoiceLine extends InvoiceLine {
 
 export type SuggestionConfidence = "alta" | "media" | "baixa" | null;
 
+export type SuggestionSource = "aprendizado" | "keyword" | null;
+
 export interface ProcessedInvoiceLine {
   id: string;
   originalId?: string;
@@ -40,6 +42,7 @@ export interface ProcessedInvoiceLine {
   isDuplicate: boolean;
   suggestedCategory: string | null;
   suggestionConfidence: SuggestionConfidence;
+  suggestionSource: SuggestionSource;
   appliedCategory: string | null;
   filterReason: FilterReason;
 }

@@ -40,6 +40,11 @@ const FILTER_REASON_LABEL: Record<Exclude<FilterReason, null>, string> = {
   estorno: "Estorno",
 };
 
+const SOURCE_LABEL: Record<"aprendizado" | "keyword", { label: string; title: string }> = {
+  aprendizado: { label: "Aprendizado", title: "Categoria sugerida pelo histórico do usuário" },
+  keyword: { label: "Catálogo", title: "Categoria sugerida pelo catálogo de comerciantes" },
+};
+
 export function InvoiceProcessorUI({ invoiceLines, onProcessed }: Props) {
   const {
     processed,
@@ -200,6 +205,15 @@ export function InvoiceProcessorUI({ invoiceLines, onProcessed }: Props) {
                             className="text-[10px]"
                           >
                             Sugestão ({line.suggestionConfidence})
+                          </Badge>
+                        )}
+                        {!line.appliedCategory && line.suggestionSource && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px]"
+                            title={SOURCE_LABEL[line.suggestionSource].title}
+                          >
+                            {SOURCE_LABEL[line.suggestionSource].label}
                           </Badge>
                         )}
                       </div>

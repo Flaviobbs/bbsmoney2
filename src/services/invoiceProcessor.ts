@@ -129,6 +129,13 @@ export function extractPurchaseDate(
   try {
     const fallback = parseISO(fallbackDate);
     if (!isValid(fallback)) return null;
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    const isPastOrToday = (y: number, m: number, d: number) => {
+      const dt = new Date(y, m - 1, d);
+      return dt.getTime() <= today.getTime();
+    };
 
     // 1) data completa dd/mm/yyyy
     for (const m of description.matchAll(DATE_DDMMYYYY)) {
@@ -136,26 +143,36 @@ export function extractPurchaseDate(
       const month = parseInt(m[2], 10);
       let year = parseInt(m[3], 10);
       if (year < 100) year += 2000;
-      if (month >= 1 && month <= 12 && isValidDateParts(year, month, day)) {
+      if (
+        month >= 1 && month <= 12 &&
+        isValidDateParts(year, month, day) &&
+        isPastOrToday(year, month, day)
+      ) {
         return format(new Date(year, month - 1, day), "yyyy-MM-dd");
       }
     }
 
-    // 2) data parcial dd/mm — para evitar colisão com indicador de parcela ("1/3"),
-    // só consideramos quando day > 12 OU month > 12 (inequívoco), e month ∈ [1..12]
+    // 2) data parcial dd/mm — evita colisão com indicador de parcela ("1/3")
     for (const m of description.matchAll(DATE_DDMM)) {
       const day = parseInt(m[1], 10);
       const month = parseInt(m[2], 10);
       if (month < 1 || month > 12) continue;
-      if (day <= 12 && month <= 12) continue; // ambíguo com parcela — descartar
+      if (day <= 12 && month <= 12) continue;
       if (day < 1 || day > 31) continue;
       let year = fallback.getFullYear();
       if (month > fallback.getMonth() + 1) year -= 1;
-      if (isValidDateParts(year, month, day)) {
+      if (!isValidDateParts(year, month, day)) continue;
+      // se cair no futuro, recua 1 ano
+      if (!isPastOrToday(year, month, day)) year -= 1;
+      if (isValidDateParts(year, month, day) && isPastOrToday(year, month, day)) {
         return format(new Date(year, month - 1, day), "yyyy-MM-dd");
       }
     }
 
+    // fallback nunca pode estar no futuro
+    if (fallback.getTime() > today.getTime()) {
+      return format(today, "yyyy-MM-dd");
+    }
     return fallbackDate;
   } catch (err) {
     console.error("[invoiceProcessor] extractPurchaseDate error", err);
@@ -269,6 +286,7 @@ export function buildLearningKey(description: string, value: number): string {
 export interface SuggestionResult {
   category: string | null;
   confidence: SuggestionConfidence;
+  source: "aprendizado" | "keyword" | null;
   score: number;
 }
 
@@ -284,7 +302,7 @@ export function suggestCategoryDetailed(
 
   // 1) match exato no aprendizado → alta confiança
   if (data[exactKey]) {
-    return { category: data[exactKey].category, confidence: "alta", score: 1 };
+    return { category: data[exactKey].category, confidence: "alta", source: "aprendizado", score: 1 };
   }
 
   const queryTokens = tokenize(description);
@@ -313,16 +331,16 @@ export function suggestCategoryDetailed(
 
   if (best && best.score >= SCORE_THRESHOLD) {
     const confidence: SuggestionConfidence = best.score >= 1 ? "alta" : best.score >= 0.7 ? "media" : "baixa";
-    return { category: best.entry.category, confidence, score: best.score };
+    return { category: best.entry.category, confidence, source: "aprendizado", score: best.score };
   }
 
   // 3) fallback: catálogo de keywords de comerciantes conhecidos
   const keywordCategory = suggestCategoryByKeyword(description);
   if (keywordCategory) {
-    return { category: keywordCategory, confidence: "media", score: 0.6 };
+    return { category: keywordCategory, confidence: "media", source: "keyword", score: 0.6 };
   }
 
-  return { category: null, confidence: null, score: best?.score ?? 0 };
+  return { category: null, confidence: null, source: null, score: best?.score ?? 0 };
 }
 
 export function suggestCategory(
@@ -376,12 +394,18 @@ function newProcessedLine(
     isDuplicate: false,
     suggestedCategory: null,
     suggestionConfidence: null,
+    suggestionSource: null,
     appliedCategory: null,
     filterReason: null,
     ...overrides,
   };
 }
 
+/**
+ * Para parcelados em fatura, geramos APENAS a parcela do mês atual de pagamento.
+ * Não criamos lançamentos futuros — eles aparecerão em faturas futuras.
+ * A data do lançamento é a data da fatura (mês de pagamento), não a data da compra original.
+ */
 export function expandParcels(lines: InvoiceLine[]): ProcessedInvoiceLine[] {
   const out: ProcessedInvoiceLine[] = [];
   for (const line of lines) {
@@ -391,18 +415,15 @@ export function expandParcels(lines: InvoiceLine[]): ProcessedInvoiceLine[] {
       continue;
     }
     const purchaseDate = extractPurchaseDate(line.description, line.date);
-    const base = purchaseDate ?? line.date;
-    for (let i = parcel.current; i <= parcel.total; i++) {
-      const offset = i - parcel.current + 1;
-      out.push(
-        newProcessedLine(line, {
-          id: `${line.id ?? crypto.randomUUID()}-p${i}`,
-          purchaseDate,
-          dueDate: calculateDueDate(base, offset),
-          isParcel: { current: i, total: parcel.total },
-        }),
-      );
-    }
+    out.push(
+      newProcessedLine(line, {
+        id: `${line.id ?? crypto.randomUUID()}-p${parcel.current}`,
+        purchaseDate,
+        // mês de pagamento da parcela = data da fatura
+        dueDate: line.date,
+        isParcel: { current: parcel.current, total: parcel.total },
+      }),
+    );
   }
   return out;
 }
@@ -414,6 +435,11 @@ export function applySuggestions(
   const data = store ?? readLearningStore();
   return lines.map((l) => {
     const res = suggestCategoryDetailed(l.description, l.value, data);
-    return { ...l, suggestedCategory: res.category, suggestionConfidence: res.confidence };
+    return {
+      ...l,
+      suggestedCategory: res.category,
+      suggestionConfidence: res.confidence,
+      suggestionSource: res.source,
+    };
   });
 }
