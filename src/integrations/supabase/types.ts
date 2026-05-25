@@ -368,21 +368,21 @@ export type Database = {
           created_at: string
           display_name: string | null
           id: string
-          pdf_password: string | null
+          pdf_password_secret_id: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           display_name?: string | null
           id: string
-          pdf_password?: string | null
+          pdf_password_secret_id?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           display_name?: string | null
           id?: string
-          pdf_password?: string | null
+          pdf_password_secret_id?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -455,7 +455,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_pdf_password: { Args: never; Returns: string }
+      set_pdf_password: { Args: { p: string }; Returns: undefined }
     }
     Enums: {
       account_type: "checking" | "savings" | "credit" | "cash" | "investment"
