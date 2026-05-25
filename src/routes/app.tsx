@@ -1,8 +1,6 @@
-import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app/AppSidebar";
-import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/app")({
   component: AppLayout,
@@ -10,10 +8,7 @@ export const Route = createFileRoute("/app")({
 
 function AppLayout() {
   // ⚠️ LOGIN TEMPORARIAMENTE DESABILITADO PARA TESTES
-  // Para reativar, restaurar o bloco com useAuth + redirect para /login.
-  useAuth();
-  void useNavigate;
-  void useEffect;
+  // Para reativar, restaurar o guard com useAuth() + redirect para /login.
 
   return (
     <SidebarProvider>
