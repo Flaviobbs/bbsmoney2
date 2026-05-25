@@ -270,7 +270,11 @@ function TransactionsPage() {
                           isOpen ? "" : "-rotate-90"
                         }`}
                       />
-                      <span className="font-semibold">{MONTH_LABEL(key)}</span>
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: g.color }}
+                      />
+                      <span className="font-semibold">{g.name}</span>
                       <span className="text-xs text-muted-foreground">
                         ({g.items.length} {g.items.length === 1 ? "lançamento" : "lançamentos"})
                       </span>
