@@ -202,7 +202,7 @@ function DocumentosPage() {
     const { docId, value, save } = pwdPrompt;
     if (!value) return toast.error("Informe a senha");
     if (save) {
-      await supabase.from("profiles").update({ pdf_password: value }).eq("id", user.id);
+      await supabase.rpc("set_pdf_password", { p: value });
     }
     setPwdPrompt(null);
     await processDoc(docId, value);

@@ -27,15 +27,16 @@ function SettingsPage() {
 
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from("profiles")
-      .select("display_name,pdf_password")
-      .eq("id", user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        setName(data?.display_name ?? "");
-        setPdfPassword(data?.pdf_password ?? "");
-      });
+    (async () => {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", user.id)
+        .maybeSingle();
+      setName(prof?.display_name ?? "");
+      const { data: pwd } = await supabase.rpc("get_pdf_password");
+      setPdfPassword((pwd as string | null) ?? "");
+    })();
   }, [user]);
 
   const save = async () => {
@@ -43,10 +44,15 @@ function SettingsPage() {
     setSaving(true);
     const { error } = await supabase
       .from("profiles")
-      .update({ display_name: name, pdf_password: pdfPassword || null })
+      .update({ display_name: name })
       .eq("id", user.id);
+    if (error) {
+      setSaving(false);
+      return toast.error(error.message);
+    }
+    const { error: pwdErr } = await supabase.rpc("set_pdf_password", { p: pdfPassword });
     setSaving(false);
-    if (error) return toast.error(error.message);
+    if (pwdErr) return toast.error(pwdErr.message);
     toast.success("Perfil atualizado");
   };
 
