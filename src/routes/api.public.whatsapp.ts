@@ -135,6 +135,12 @@ export const Route = createFileRoute("/api/public/whatsapp")({
           categoria: string;
         };
 
+        // Sanitiza data: válida, ISO, nunca no futuro. Fallback = hoje (BR).
+        const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+        if (!parsed.data || !isoDate.test(parsed.data) || parsed.data > todayBR) {
+          parsed.data = todayBR;
+        }
+
         const cat = (cats ?? []).find(
           (c) => c.name.toLowerCase() === parsed.categoria.toLowerCase() && c.type === parsed.tipo,
         );
