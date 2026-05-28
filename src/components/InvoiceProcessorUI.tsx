@@ -56,18 +56,36 @@ export function InvoiceProcessorUI({ invoiceLines, onProcessed }: Props) {
     applyCategory,
     restoreFiltered,
   } = useInvoiceProcessing();
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [categories, setCategories] = useState<
+    { id: string; name: string; parent_id: string | null; displayName: string }[]
+  >([]);
   const [showFiltered, setShowFiltered] = useState(false);
 
   useEffect(() => {
     let active = true;
     supabase
       .from("categories")
-      .select("id,name")
+      .select("id,name,parent_id")
       .order("name")
       .then(({ data }) => {
         if (!active) return;
-        setCategories(data ?? []);
+        const raw = (data ?? []) as { id: string; name: string; parent_id: string | null }[];
+        // Ordena: pais primeiro, filhos logo abaixo, com indentação
+        const parents = raw.filter((c) => !c.parent_id);
+        const ordered: { id: string; name: string; parent_id: string | null; displayName: string }[] = [];
+        for (const p of parents) {
+          ordered.push({ ...p, displayName: p.name });
+          for (const child of raw.filter((c) => c.parent_id === p.id)) {
+            ordered.push({ ...child, displayName: `↳ ${child.name}` });
+          }
+        }
+        // órfãos
+        for (const c of raw) {
+          if (!ordered.find((o) => o.id === c.id)) {
+            ordered.push({ ...c, displayName: c.name });
+          }
+        }
+        setCategories(ordered);
       });
     return () => {
       active = false;
