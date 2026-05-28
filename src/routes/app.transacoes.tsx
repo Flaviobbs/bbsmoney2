@@ -414,7 +414,32 @@ function EditCategoryDialog({
       }
       finalCategoryId = data.id;
     }
+    const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+    if (!isoDate.test(date)) {
+      setSaving(false);
+      return toast.error("Data inválida");
+    }
+    const todayBR = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+    if (date > todayBR) {
+      setSaving(false);
+      return toast.error("Não é permitido data no futuro");
+    }
+    const dateChanged = date !== tx.date;
     const desc = (tx.description ?? "").trim();
+
+    // 1) Atualiza data sempre apenas no lançamento atual
+    if (dateChanged) {
+      const { error: dErr } = await supabase
+        .from("transactions")
+        .update({ date })
+        .eq("id", tx.id);
+      if (dErr) {
+        setSaving(false);
+        return toast.error(dErr.message);
+      }
+    }
+
+    // 2) Atualiza categoria (no atual ou em todos com mesma descrição)
     let query = supabase
       .from("transactions")
       .update({ category_id: finalCategoryId || null });
@@ -429,11 +454,12 @@ function EditCategoryDialog({
     const count = updated?.length ?? 0;
     toast.success(
       applyAll && desc
-        ? `Categoria atualizada em ${count} transaç${count === 1 ? "ão" : "ões"}`
-        : "Categoria atualizada",
+        ? `Atualizado em ${count} transaç${count === 1 ? "ão" : "ões"}`
+        : "Transação atualizada",
     );
     onSaved();
   };
+
 
   return (
     <Dialog open={!!tx} onOpenChange={(v) => !v && onClose()}>
