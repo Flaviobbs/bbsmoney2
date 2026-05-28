@@ -465,16 +465,29 @@ function EditCategoryDialog({
     <Dialog open={!!tx} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Alterar categoria</DialogTitle>
+          <DialogTitle>Editar transação</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
             <div className="font-medium truncate">{tx.description || "Sem descrição"}</div>
             <div className="text-xs text-muted-foreground">
-              {new Date(tx.date + "T00:00:00").toLocaleDateString("pt-BR")} •{" "}
               {tx.type === "income" ? "Receita" : "Despesa"} • {formatCurrency(Number(tx.amount))}
             </div>
           </div>
+
+          <div className="space-y-2">
+            <Label>Data</Label>
+            <Input
+              type="date"
+              value={date}
+              max={new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })}
+              onChange={(e) => setDate(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              A alteração de data se aplica somente a este lançamento.
+            </p>
+          </div>
+
 
           {!creating ? (
             <>
