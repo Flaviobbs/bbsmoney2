@@ -366,6 +366,7 @@ function EditCategoryDialog({
   onSaved: () => void;
 }) {
   const [categoryId, setCategoryId] = useState<string>("");
+  const [date, setDate] = useState<string>("");
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState(COLORS[0]);
@@ -375,12 +376,14 @@ function EditCategoryDialog({
   useEffect(() => {
     if (tx) {
       setCategoryId(tx.category_id ?? "");
+      setDate(tx.date);
       setCreating(false);
       setNewName("");
       setNewColor(COLORS[0]);
       setApplyAll(true);
     }
   }, [tx]);
+
 
   if (!tx) return null;
   const filteredCats = cats.filter((c) => c.type === tx.type);
