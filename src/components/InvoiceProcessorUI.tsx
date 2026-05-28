@@ -199,7 +199,7 @@ export function InvoiceProcessorUI({ invoiceLines, onProcessed }: Props) {
                         <SelectContent>
                           {categories.map((c) => (
                             <SelectItem key={c.id} value={c.name}>
-                              {c.name}
+                              {c.displayName}
                             </SelectItem>
                           ))}
                         </SelectContent>
