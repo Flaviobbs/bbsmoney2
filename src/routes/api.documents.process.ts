@@ -83,6 +83,10 @@ export const Route = createFileRoute("/api/documents/process")({
             .select("id,name,type");
           const catList = (cats ?? []).map((c) => `${c.name} (${c.type})`).join(", ");
 
+          const todayBR = new Date().toLocaleDateString("en-CA", {
+            timeZone: "America/Sao_Paulo",
+          });
+
           const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
             method: "POST",
             headers: {
@@ -95,7 +99,13 @@ export const Route = createFileRoute("/api/documents/process")({
                 {
                   role: "system",
                   content:
-                    "Você analisa extratos/faturas/recibos em PT-BR e extrai transações. Use SOMENTE valores presentes no texto. Categorize com base na lista fornecida; se nenhuma encaixar, use 'Outros'. Datas no formato AAAA-MM-DD.",
+                    `Você analisa extratos/faturas/recibos em PT-BR e extrai transações. Use SOMENTE valores presentes no texto. ` +
+                    `Categorize com base na lista fornecida; se nenhuma encaixar, use 'Outros'. Datas no formato AAAA-MM-DD. ` +
+                    `Hoje é ${todayBR} (America/Sao_Paulo). NUNCA retorne datas no futuro — se a data extraída for posterior a ${todayBR}, recue para o ano anterior. ` +
+                    `Para faturas de cartão de crédito: tente identificar a data de vencimento/mês de referência da fatura. ` +
+                    `COMPRAS PARCELADAS (ex: "PARC 03/12", "1/10", "PARCELA 2 DE 6"): inclua APENAS a parcela do mês atual da fatura (não gere parcelas futuras). ` +
+                    `Para parcelas, o campo "data" deve ser a data de vencimento/pagamento daquela parcela (mês da fatura), NÃO a data da compra original. ` +
+                    `Preencha "parcela_atual" e "parcela_total" sempre que detectar parcelamento.`,
                 },
                 {
                   role: "user",
