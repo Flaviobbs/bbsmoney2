@@ -553,7 +553,8 @@ function EditCategoryDialog({
                 className="mt-0.5"
               />
               <span>
-                Aplicar a todas as transações com a descrição{" "}
+                Aplicar <span className="font-medium">categoria</span> a todas as transações com a descrição{" "}
+
                 <span className="font-medium">"{tx.description.trim()}"</span>{" "}
                 <span className="text-muted-foreground">
                   (anteriores e futuras do mesmo tipo)
