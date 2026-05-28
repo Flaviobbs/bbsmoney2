@@ -161,7 +161,23 @@ export const Route = createFileRoute("/api/documents/process")({
           const aiJson = await aiRes.json();
           const toolCall = aiJson.choices?.[0]?.message?.tool_calls?.[0];
           const parsed = toolCall ? JSON.parse(toolCall.function.arguments) : { sugestoes: [] };
-          const suggestions = parsed.sugestoes ?? [];
+          const rawSuggestions: Array<Record<string, unknown>> = parsed.sugestoes ?? [];
+
+          // Sanitiza datas: nunca futuro; se ausente/ inválida, usa hoje.
+          const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+          const suggestions = rawSuggestions.map((s) => {
+            const d = typeof s.data === "string" ? s.data : "";
+            let safeDate = d;
+            if (!isoDate.test(safeDate)) {
+              safeDate = todayBR;
+            } else if (safeDate > todayBR) {
+              // recua 1 ano (caso comum: AAAA inferido errado)
+              const [y, m, day] = safeDate.split("-");
+              const prev = `${Number(y) - 1}-${m}-${day}`;
+              safeDate = prev <= todayBR ? prev : todayBR;
+            }
+            return { ...s, data: safeDate };
+          });
 
           await supabase.from("document_extractions").insert({
             document_id: doc.id,
