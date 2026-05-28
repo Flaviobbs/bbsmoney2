@@ -366,6 +366,7 @@ function EditCategoryDialog({
   onSaved: () => void;
 }) {
   const [categoryId, setCategoryId] = useState<string>("");
+  const [date, setDate] = useState<string>("");
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState(COLORS[0]);
@@ -375,12 +376,14 @@ function EditCategoryDialog({
   useEffect(() => {
     if (tx) {
       setCategoryId(tx.category_id ?? "");
+      setDate(tx.date);
       setCreating(false);
       setNewName("");
       setNewColor(COLORS[0]);
       setApplyAll(true);
     }
   }, [tx]);
+
 
   if (!tx) return null;
   const filteredCats = cats.filter((c) => c.type === tx.type);
@@ -411,7 +414,32 @@ function EditCategoryDialog({
       }
       finalCategoryId = data.id;
     }
+    const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+    if (!isoDate.test(date)) {
+      setSaving(false);
+      return toast.error("Data inválida");
+    }
+    const todayBR = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+    if (date > todayBR) {
+      setSaving(false);
+      return toast.error("Não é permitido data no futuro");
+    }
+    const dateChanged = date !== tx.date;
     const desc = (tx.description ?? "").trim();
+
+    // 1) Atualiza data sempre apenas no lançamento atual
+    if (dateChanged) {
+      const { error: dErr } = await supabase
+        .from("transactions")
+        .update({ date })
+        .eq("id", tx.id);
+      if (dErr) {
+        setSaving(false);
+        return toast.error(dErr.message);
+      }
+    }
+
+    // 2) Atualiza categoria (no atual ou em todos com mesma descrição)
     let query = supabase
       .from("transactions")
       .update({ category_id: finalCategoryId || null });
@@ -426,26 +454,40 @@ function EditCategoryDialog({
     const count = updated?.length ?? 0;
     toast.success(
       applyAll && desc
-        ? `Categoria atualizada em ${count} transaç${count === 1 ? "ão" : "ões"}`
-        : "Categoria atualizada",
+        ? `Atualizado em ${count} transaç${count === 1 ? "ão" : "ões"}`
+        : "Transação atualizada",
     );
     onSaved();
   };
+
 
   return (
     <Dialog open={!!tx} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Alterar categoria</DialogTitle>
+          <DialogTitle>Editar transação</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
             <div className="font-medium truncate">{tx.description || "Sem descrição"}</div>
             <div className="text-xs text-muted-foreground">
-              {new Date(tx.date + "T00:00:00").toLocaleDateString("pt-BR")} •{" "}
               {tx.type === "income" ? "Receita" : "Despesa"} • {formatCurrency(Number(tx.amount))}
             </div>
           </div>
+
+          <div className="space-y-2">
+            <Label>Data</Label>
+            <Input
+              type="date"
+              value={date}
+              max={new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })}
+              onChange={(e) => setDate(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              A alteração de data se aplica somente a este lançamento.
+            </p>
+          </div>
+
 
           {!creating ? (
             <>
@@ -511,7 +553,8 @@ function EditCategoryDialog({
                 className="mt-0.5"
               />
               <span>
-                Aplicar a todas as transações com a descrição{" "}
+                Aplicar <span className="font-medium">categoria</span> a todas as transações com a descrição{" "}
+
                 <span className="font-medium">"{tx.description.trim()}"</span>{" "}
                 <span className="text-muted-foreground">
                   (anteriores e futuras do mesmo tipo)
