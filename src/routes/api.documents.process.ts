@@ -132,6 +132,8 @@ export const Route = createFileRoute("/api/documents/process")({
                               data: { type: "string" },
                               categoria: { type: "string" },
                               comerciante: { type: "string" },
+                              parcela_atual: { type: "number" },
+                              parcela_total: { type: "number" },
                             },
                             required: ["descricao", "valor", "tipo", "data", "categoria"],
                             additionalProperties: false,
