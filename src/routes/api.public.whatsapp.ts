@@ -66,6 +66,10 @@ export const Route = createFileRoute("/api/public/whatsapp")({
         const accountId = accounts?.[0]?.id ?? null;
         const catList = (cats ?? []).map((c) => `${c.name} (${c.type})`).join(", ");
 
+        const todayBR = new Date().toLocaleDateString("en-CA", {
+          timeZone: "America/Sao_Paulo",
+        });
+
         const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -78,7 +82,9 @@ export const Route = createFileRoute("/api/public/whatsapp")({
               {
                 role: "system",
                 content:
-                  "Você interpreta mensagens curtas em PT-BR sobre finanças pessoais e extrai uma única transação. Use a categoria mais próxima da lista; se nenhuma encaixar, use 'Outros'. Data padrão = hoje (AAAA-MM-DD).",
+                  `Você interpreta mensagens curtas em PT-BR sobre finanças pessoais e extrai uma única transação. Use a categoria mais próxima da lista; se nenhuma encaixar, use 'Outros'. ` +
+                  `Hoje é ${todayBR} (fuso America/Sao_Paulo). Quando o usuário disser "hoje", "agora" ou não informar a data, use exatamente ${todayBR}. ` +
+                  `"Ontem" = um dia antes; "anteontem" = dois dias antes. NUNCA retorne datas no futuro. Formato sempre AAAA-MM-DD.`,
               },
               { role: "user", content: `Categorias: ${catList}\nMensagem: "${message}"` },
             ],
@@ -128,6 +134,12 @@ export const Route = createFileRoute("/api/public/whatsapp")({
           data: string;
           categoria: string;
         };
+
+        // Sanitiza data: válida, ISO, nunca no futuro. Fallback = hoje (BR).
+        const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+        if (!parsed.data || !isoDate.test(parsed.data) || parsed.data > todayBR) {
+          parsed.data = todayBR;
+        }
 
         const cat = (cats ?? []).find(
           (c) => c.name.toLowerCase() === parsed.categoria.toLowerCase() && c.type === parsed.tipo,
