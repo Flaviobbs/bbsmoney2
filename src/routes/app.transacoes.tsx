@@ -137,6 +137,17 @@ function TransactionsPage() {
     load();
   };
 
+  const [wiping, setWiping] = useState(false);
+  const wipeAll = async () => {
+    if (!user) return;
+    setWiping(true);
+    const { error } = await supabase.from("transactions").delete().eq("user_id", user.id);
+    setWiping(false);
+    if (error) return toast.error(error.message);
+    toast.success("Todas as transações foram apagadas");
+    load();
+  };
+
   const filtered = tx.filter((t) => {
     if (filterType !== "all" && t.type !== filterType) return false;
     if (filterCategory !== "all") {
