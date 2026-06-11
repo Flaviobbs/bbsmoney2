@@ -236,6 +236,9 @@ function TransactionsPage() {
             />
           </Dialog>
         </div>
+      </div>
+
+
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative max-w-sm flex-1">
