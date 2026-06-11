@@ -27,9 +27,20 @@ import {
 } from "@/components/ui/collapsible";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, Search, ChevronDown } from "lucide-react";
+import { Plus, Trash2, Search, ChevronDown, AlertTriangle } from "lucide-react";
 import { formatCurrency, todayISO } from "@/lib/format";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/app/transacoes")({
   component: TransactionsPage,
@@ -126,6 +137,17 @@ function TransactionsPage() {
     load();
   };
 
+  const [wiping, setWiping] = useState(false);
+  const wipeAll = async () => {
+    if (!user) return;
+    setWiping(true);
+    const { error } = await supabase.from("transactions").delete().eq("user_id", user.id);
+    setWiping(false);
+    if (error) return toast.error(error.message);
+    toast.success("Todas as transações foram apagadas");
+    load();
+  };
+
   const filtered = tx.filter((t) => {
     if (filterType !== "all" && t.type !== filterType) return false;
     if (filterCategory !== "all") {
@@ -170,23 +192,53 @@ function TransactionsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Transações</h1>
           <p className="text-sm text-muted-foreground">Gerencie receitas e despesas</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-1 h-4 w-4" /> Nova transação
-            </Button>
-          </DialogTrigger>
-          <TransactionDialog
-            open={open}
-            cats={cats}
-            accs={accs}
-            onSaved={() => {
-              setOpen(false);
-              load();
-            }}
-          />
-        </Dialog>
+        <div className="flex items-center gap-2">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" disabled={wiping || tx.length === 0}>
+                <AlertTriangle className="mr-1 h-4 w-4 text-destructive" />
+                Apagar todas
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Apagar todas as transações?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta ação remove permanentemente todas as suas transações e zera o dashboard.
+                  Categorias, contas e configurações permanecem intactas. Não é possível desfazer.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={wipeAll}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Apagar tudo
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-1 h-4 w-4" /> Nova transação
+              </Button>
+            </DialogTrigger>
+            <TransactionDialog
+              open={open}
+              cats={cats}
+              accs={accs}
+              onSaved={() => {
+                setOpen(false);
+                load();
+              }}
+            />
+          </Dialog>
+        </div>
       </div>
+
+
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative max-w-sm flex-1">
