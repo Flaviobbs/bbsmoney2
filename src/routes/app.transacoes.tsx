@@ -192,23 +192,50 @@ function TransactionsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Transações</h1>
           <p className="text-sm text-muted-foreground">Gerencie receitas e despesas</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-1 h-4 w-4" /> Nova transação
-            </Button>
-          </DialogTrigger>
-          <TransactionDialog
-            open={open}
-            cats={cats}
-            accs={accs}
-            onSaved={() => {
-              setOpen(false);
-              load();
-            }}
-          />
-        </Dialog>
-      </div>
+        <div className="flex items-center gap-2">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" disabled={wiping || tx.length === 0}>
+                <AlertTriangle className="mr-1 h-4 w-4 text-destructive" />
+                Apagar todas
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Apagar todas as transações?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta ação remove permanentemente todas as suas transações e zera o dashboard.
+                  Categorias, contas e configurações permanecem intactas. Não é possível desfazer.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={wipeAll}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Apagar tudo
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-1 h-4 w-4" /> Nova transação
+              </Button>
+            </DialogTrigger>
+            <TransactionDialog
+              open={open}
+              cats={cats}
+              accs={accs}
+              onSaved={() => {
+                setOpen(false);
+                load();
+              }}
+            />
+          </Dialog>
+        </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative max-w-sm flex-1">
