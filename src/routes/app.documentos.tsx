@@ -18,7 +18,10 @@ import {
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Loader2, Upload, FileText, Trash2, Check, X } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { formatCurrency } from "@/lib/format";
+import { suggestCategoryDetailed, learnCategory } from "@/services/invoiceProcessor";
+
 
 export const Route = createFileRoute("/app/documentos")({
   component: DocumentosPage,
