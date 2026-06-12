@@ -24,6 +24,8 @@ function SettingsPage() {
   const [waMsg, setWaMsg] = useState("Gastei 50 reais no mercado hoje");
   const [waLoading, setWaLoading] = useState(false);
   const [waResult, setWaResult] = useState<string | null>(null);
+  const [backupBusy, setBackupBusy] = useState(false);
+
 
   useEffect(() => {
     if (!user) return;
