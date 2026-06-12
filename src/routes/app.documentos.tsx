@@ -501,6 +501,15 @@ function DocumentosPage() {
                 {d.error_message && (
                   <div className="text-xs text-destructive">{d.error_message}</div>
                 )}
+                {processingId === d.id && (
+                  <div className="space-y-1">
+                    <Progress value={processingProgress.pct} />
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{processingProgress.stage}</span>
+                      <span>{Math.round(processingProgress.pct)}%</span>
+                    </div>
+                  </div>
+                )}
                 {open && ex && (
                   <div className="space-y-2 border-t pt-3">
                     {ex.suggestions.length === 0 && (
