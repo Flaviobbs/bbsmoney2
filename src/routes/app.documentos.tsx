@@ -365,6 +365,10 @@ function DocumentosPage() {
       });
       const { error } = await supabase.from("transactions").insert(rows);
       if (error) throw error;
+      for (const { s } of sugs) {
+        try { if (s.categoria) learnCategory(s.descricao, Number(s.valor), s.categoria); } catch (_) {}
+      }
+
       const idxSet = new Set(indices);
       const remaining = ex.suggestions.filter((_, i) => !idxSet.has(i));
       await supabase
