@@ -85,9 +85,69 @@ function SettingsPage() {
     }
   };
 
+  const downloadBackup = async () => {
+    if (!user) return;
+    setBackupBusy(true);
+    try {
+      const tables = [
+        "profiles",
+        "accounts",
+        "categories",
+        "transactions",
+        "bills",
+        "budgets",
+        "goals",
+        "ai_insights",
+        "document_extractions",
+        "documents",
+        "ingestion_logs",
+      ] as const;
+      const out: Record<string, unknown> = {
+        meta: {
+          app: "BBSMoney",
+          version: 1,
+          exported_at: new Date().toISOString(),
+          user_id: user.id,
+        },
+      };
+      for (const t of tables) {
+        const { data, error } = await supabase.from(t).select("*");
+        if (error) {
+          console.error("[backup]", t, error);
+          out[t] = { error: error.message };
+        } else {
+          out[t] = data ?? [];
+        }
+      }
+      // Inclui o aprendizado de categorias (localStorage)
+      try {
+        const raw = window.localStorage.getItem("bbsmoney_category_learning");
+        if (raw) out.category_learning_local = JSON.parse(raw);
+      } catch (_) {
+        /* ignora */
+      }
+      const blob = new Blob([JSON.stringify(out, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const stamp = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `bbsmoney-backup-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Backup baixado");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao gerar backup");
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
   const curlExample = user
     ? `curl -X POST ${typeof window !== "undefined" ? window.location.origin : ""}/api/public/whatsapp \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer <SEU_ACCESS_TOKEN>" \\\n  -d '{"message":"Gastei 50 reais no mercado"}'`
     : "";
+
 
   return (
     <div className="space-y-6">
