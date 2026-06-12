@@ -76,16 +76,17 @@ function Dashboard() {
     const d = new Date();
     switch (period) {
       case "1m":
-        d.setMonth(d.getMonth() - 1);
-        break;
+        // mês corrente: do dia 1 até hoje
+        d.setDate(1);
+        return d.toISOString().slice(0, 10);
       case "3m":
-        d.setMonth(d.getMonth() - 3);
+        d.setMonth(d.getMonth() - 2);
         break;
       case "6m":
-        d.setMonth(d.getMonth() - 6);
+        d.setMonth(d.getMonth() - 5);
         break;
       case "12m":
-        d.setMonth(d.getMonth() - 12);
+        d.setMonth(d.getMonth() - 11);
         break;
       case "custom":
         return customStart;
@@ -93,6 +94,7 @@ function Dashboard() {
     d.setDate(1);
     return d.toISOString().slice(0, 10);
   }, [period, customStart]);
+
 
   const periodEnd = useMemo(() => {
     if (period === "custom") return customEnd;
