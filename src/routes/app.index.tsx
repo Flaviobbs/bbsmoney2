@@ -225,7 +225,7 @@ function Dashboard() {
               <SelectValue placeholder="Período" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="1m">Último mês</SelectItem>
+              <SelectItem value="1m">Mês corrente</SelectItem>
               <SelectItem value="3m">Últimos 3 meses</SelectItem>
               <SelectItem value="6m">Últimos 6 meses</SelectItem>
               <SelectItem value="12m">Últimos 12 meses</SelectItem>
