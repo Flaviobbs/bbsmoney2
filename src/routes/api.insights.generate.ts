@@ -119,19 +119,20 @@ export const Route = createFileRoute("/api/insights/generate")({
 
         const aggregated = {
           periodo: { inicio: periodStart, fim: periodEnd },
-          mes_atual: {
+          periodo_atual: {
             receitas: Math.round(incomeCur * 100) / 100,
             despesas: Math.round(expenseCur * 100) / 100,
             saldo: Math.round((incomeCur - expenseCur) * 100) / 100,
           },
-          mes_anterior: {
+          periodo_anterior: {
             receitas: Math.round(incomePrev * 100) / 100,
             despesas: Math.round(expensePrev * 100) / 100,
           },
           top_categorias_despesa: topCategories,
           orcamentos: budgetsAgg,
-          total_transacoes_mes: cur.length,
+          total_transacoes_periodo: cur.length,
         };
+
 
         const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
