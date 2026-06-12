@@ -199,15 +199,54 @@ function Dashboard() {
 
   if (loading) return <div className="text-sm text-muted-foreground">Carregando...</div>;
 
+  const periodLabel = useMemo(() => {
+    switch (period) {
+      case "1m": return "Último mês";
+      case "3m": return "Últimos 3 meses";
+      case "6m": return "Últimos 6 meses";
+      case "12m": return "Últimos 12 meses";
+      case "custom": return `${formatDate(periodStart)} a ${formatDate(periodEnd)}`;
+    }
+  }, [period, periodStart, periodEnd]);
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Visão geral</h1>
-        <p className="text-sm text-muted-foreground">Seu resumo financeiro do mês</p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Visão geral</h1>
+          <p className="text-sm text-muted-foreground">{periodLabel}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Select value={period} onValueChange={(v) => setPeriod(v as PeriodOption)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Período" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1m">Último mês</SelectItem>
+              <SelectItem value="3m">Últimos 3 meses</SelectItem>
+              <SelectItem value="6m">Últimos 6 meses</SelectItem>
+              <SelectItem value="12m">Últimos 12 meses</SelectItem>
+              <SelectItem value="custom">Personalizado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
+      {period === "custom" && (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground">De</label>
+            <Input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} max={todayISO()} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground">Até</label>
+            <Input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} max={todayISO()} />
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Saldo do mês" value={formatCurrency(balance)} icon={Wallet} accent="primary" />
+        <StatCard label="Saldo do período" value={formatCurrency(balance)} icon={Wallet} accent="primary" />
         <StatCard label="Receitas" value={formatCurrency(income)} icon={ArrowUpRight} accent="success" />
         <StatCard label="Despesas" value={formatCurrency(expense)} icon={ArrowDownRight} accent="destructive" />
         <StatCard label="Economia" value={`${savingsPct}%`} icon={PiggyBank} accent="primary" />
