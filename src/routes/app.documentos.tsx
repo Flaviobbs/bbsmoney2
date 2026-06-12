@@ -168,6 +168,19 @@ function DocumentosPage() {
   const processDoc = async (docId: string, password?: string) => {
     if (!session) return;
     setProcessingId(docId);
+    setProcessingProgress({ pct: 5, stage: "Baixando PDF..." });
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      setProcessingProgress((prev) => {
+        const elapsed = (Date.now() - startedAt) / 1000;
+        let stage = prev.stage;
+        if (elapsed < 3) stage = "Baixando PDF...";
+        else if (elapsed < 8) stage = "Extraindo texto...";
+        else stage = "Analisando com IA (pode levar ~30s)...";
+        const next = Math.min(prev.pct + (prev.pct < 60 ? 4 : 1.2), 95);
+        return { pct: next, stage };
+      });
+    }, 700);
     try {
       const res = await fetch("/api/documents/process", {
         method: "POST",
@@ -191,16 +204,46 @@ function DocumentosPage() {
         }
         throw new Error(json.error ?? "Erro");
       }
-      toast.success(`${json.suggestions?.length ?? 0} sugestões geradas`);
+      // Aplica aprendizado local sobre as sugestões da IA (alta confiança vence)
+      const aiSuggestions = (json.suggestions ?? []) as Suggestion[];
+      const overridden = aiSuggestions.map((s) => {
+        try {
+          const res = suggestCategoryDetailed(s.descricao, Number(s.valor));
+          if (res.category && res.confidence === "alta" && res.source === "aprendizado") {
+            return { ...s, categoria: res.category };
+          }
+        } catch (_) {
+          /* ignora */
+        }
+        return s;
+      });
+      if (overridden.some((s, i) => s.categoria !== aiSuggestions[i].categoria)) {
+        // Persiste no extraction para que a próxima carga já reflita
+        const { data: ex } = await supabase
+          .from("document_extractions")
+          .select("id")
+          .eq("document_id", docId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (ex?.id) {
+          await supabase.from("document_extractions").update({ suggestions: overridden }).eq("id", ex.id);
+        }
+      }
+      setProcessingProgress({ pct: 100, stage: "Concluído" });
+      toast.success(`${overridden.length} sugestões geradas`);
       setOpenDocId(docId);
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro");
       await load();
     } finally {
+      clearInterval(timer);
       setProcessingId(null);
+      setTimeout(() => setProcessingProgress({ pct: 0, stage: "" }), 800);
     }
   };
+
 
   const submitPassword = async () => {
     if (!pwdPrompt || !user) return;
