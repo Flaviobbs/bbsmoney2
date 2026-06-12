@@ -259,7 +259,7 @@ function Dashboard() {
           </CardHeader>
           <CardContent className="h-[280px]">
             {expenseByCat.length === 0 ? (
-              <EmptyChart label="Sem despesas neste mês" />
+              <EmptyChart label="Sem despesas no período" />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
