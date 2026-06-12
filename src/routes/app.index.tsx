@@ -203,13 +203,14 @@ function Dashboard() {
 
   const periodLabel = useMemo(() => {
     switch (period) {
-      case "1m": return "Último mês";
+      case "1m": return "Mês corrente";
       case "3m": return "Últimos 3 meses";
       case "6m": return "Últimos 6 meses";
       case "12m": return "Últimos 12 meses";
       case "custom": return `${formatDate(periodStart)} a ${formatDate(periodEnd)}`;
     }
   }, [period, periodStart, periodEnd]);
+
 
   return (
     <div className="space-y-6">
