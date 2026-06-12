@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, Search, ChevronDown, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Search, ChevronDown, AlertTriangle, Tag } from "lucide-react";
 import { formatCurrency, todayISO } from "@/lib/format";
 import { toast } from "sonner";
 import {
@@ -41,6 +41,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { learnCategory } from "@/services/invoiceProcessor";
+
 
 export const Route = createFileRoute("/app/transacoes")({
   component: TransactionsPage,
