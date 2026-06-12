@@ -684,6 +684,18 @@ function EditCategoryDialog({
     setSaving(false);
     if (error) return toast.error(error.message);
     const count = updated?.length ?? 0;
+    // Aprende essa categorização para futuras importações de PDF
+    if (finalCategoryId && desc) {
+      const catName = cats.find((c) => c.id === finalCategoryId)?.name
+        ?? (creating ? newName.trim() : null);
+      if (catName) {
+        try {
+          learnCategory(desc, Number(tx.amount), catName);
+        } catch (_) {
+          /* ignora */
+        }
+      }
+    }
     toast.success(
       applyAll && desc
         ? `Atualizado em ${count} transaç${count === 1 ? "ão" : "ões"}`
@@ -691,6 +703,7 @@ function EditCategoryDialog({
     );
     onSaved();
   };
+
 
 
   return (
