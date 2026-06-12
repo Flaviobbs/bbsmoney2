@@ -384,7 +384,93 @@ function TransactionsPage() {
               ))}
           </SelectContent>
         </Select>
+        <Select value={groupBy} onValueChange={(v) => setGroupBy(v as "category" | "month")}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Agrupar por" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="category">Agrupar por categoria</SelectItem>
+            <SelectItem value="month">Agrupar por mês</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
+
+      {filtered.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <Checkbox checked={allVisibleSelected} onCheckedChange={toggleAllVisible} />
+            <span className="text-xs text-muted-foreground">
+              {selected.size === 0
+                ? `Selecionar todas (${filtered.length})`
+                : `${selected.size} selecionada${selected.size === 1 ? "" : "s"}`}
+            </span>
+          </label>
+          <div className="ml-auto flex gap-2">
+            <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline" disabled={selected.size === 0}>
+                  <Tag className="mr-1 h-4 w-4" /> Mudar categoria
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>
+                    Mudar categoria de {selected.size} transaç{selected.size === 1 ? "ão" : "ões"}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <Label>Categoria</Label>
+                  <Select value={bulkCategoryId} onValueChange={setBulkCategoryId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecionar..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Sem categoria</SelectItem>
+                      {buildCatTree(cats).map(({ cat: c, depth }) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          <span className="inline-flex items-center gap-2">
+                            {depth > 0 && <span className="text-muted-foreground">↳</span>}
+                            <span
+                              className="h-2.5 w-2.5 rounded-full"
+                              style={{ backgroundColor: c.color }}
+                            />
+                            {c.name} <span className="text-xs text-muted-foreground">({c.type === "income" ? "Receita" : "Despesa"})</span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setBulkOpen(false)}>Cancelar</Button>
+                  <Button onClick={bulkApplyCategory} disabled={bulkSaving || !bulkCategoryId}>
+                    {bulkSaving ? "Aplicando..." : "Aplicar"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="outline" disabled={selected.size === 0}>
+                  <Trash2 className="mr-1 h-4 w-4 text-destructive" /> Excluir
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Excluir {selected.size} transaç{selected.size === 1 ? "ão" : "ões"}?</AlertDialogTitle>
+                  <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={bulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Excluir
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+      )}
 
       {groups.length === 0 ? (
         <Card>
@@ -437,6 +523,11 @@ function TransactionsPage() {
                             key={t.id}
                             className="flex items-center justify-between gap-3 px-4 py-3"
                           >
+                            <Checkbox
+                              checked={selected.has(t.id)}
+                              onCheckedChange={() => toggleOne(t.id)}
+                              onClick={(e) => e.stopPropagation()}
+                            />
                             <button
                               type="button"
                               onClick={() => setEditing(t)}
@@ -480,6 +571,7 @@ function TransactionsPage() {
           })}
         </div>
       )}
+
 
       <EditCategoryDialog
         tx={editing}
