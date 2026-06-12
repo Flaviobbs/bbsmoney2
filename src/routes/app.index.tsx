@@ -278,7 +278,7 @@ function Dashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Receitas vs Despesas (6 meses)</CardTitle>
+            <CardTitle className="text-base">Receitas vs Despesas ({periodLabel})</CardTitle>
           </CardHeader>
           <CardContent className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
