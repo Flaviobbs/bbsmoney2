@@ -5,6 +5,14 @@ import { useAuth } from "@/lib/auth";
 import { formatCurrency, monthLabel, formatDate, todayISO } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -59,12 +67,55 @@ function Dashboard() {
   const [upcoming, setUpcoming] = useState<UpcomingBill[]>([]);
   const [loading, setLoading] = useState(true);
 
+  type PeriodOption = "1m" | "3m" | "6m" | "12m" | "custom";
+  const [period, setPeriod] = useState<PeriodOption>("6m");
+  const [customStart, setCustomStart] = useState(todayISO());
+  const [customEnd, setCustomEnd] = useState(todayISO());
+
+  const periodStart = useMemo(() => {
+    const d = new Date();
+    switch (period) {
+      case "1m":
+        d.setMonth(d.getMonth() - 1);
+        break;
+      case "3m":
+        d.setMonth(d.getMonth() - 3);
+        break;
+      case "6m":
+        d.setMonth(d.getMonth() - 6);
+        break;
+      case "12m":
+        d.setMonth(d.getMonth() - 12);
+        break;
+      case "custom":
+        return customStart;
+    }
+    d.setDate(1);
+    return d.toISOString().slice(0, 10);
+  }, [period, customStart]);
+
+  const periodEnd = useMemo(() => {
+    if (period === "custom") return customEnd;
+    return todayISO();
+  }, [period, customEnd]);
+
+  const periodMonths = useMemo(() => {
+    switch (period) {
+      case "1m": return 1;
+      case "3m": return 3;
+      case "6m": return 6;
+      case "12m": return 12;
+      case "custom": {
+        const s = new Date(periodStart + "T00:00:00");
+        const e = new Date(periodEnd + "T00:00:00");
+        return Math.max(1, (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()) + 1);
+      }
+    }
+  }, [period, periodStart, periodEnd]);
+
   useEffect(() => {
     if (!user) return;
     const load = async () => {
-      const since = new Date();
-      since.setMonth(since.getMonth() - 6);
-      since.setDate(1);
       const today = todayISO();
       const in7 = new Date();
       in7.setDate(in7.getDate() + 7);
@@ -73,7 +124,8 @@ function Dashboard() {
         supabase
           .from("transactions")
           .select("id,type,amount,date,description,category_id")
-          .gte("date", since.toISOString().slice(0, 10))
+          .gte("date", periodStart)
+          .lte("date", periodEnd)
           .order("date", { ascending: false }),
         supabase.from("categories").select("id,name,color,type"),
         supabase
@@ -91,18 +143,18 @@ function Dashboard() {
       setLoading(false);
     };
     load();
-  }, [user]);
+  }, [user, periodStart, periodEnd]);
 
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    .toISOString()
-    .slice(0, 10);
 
-  const monthTx = tx.filter((t) => t.date >= monthStart);
-  const income = monthTx
+  const periodTx = useMemo(() => {
+    return tx.filter((t) => t.date >= periodStart && t.date <= periodEnd);
+  }, [tx, periodStart, periodEnd]);
+
+  const income = periodTx
     .filter((t) => t.type === "income")
     .reduce((s, t) => s + Number(t.amount), 0);
-  const expense = monthTx
+  const expense = periodTx
     .filter((t) => t.type === "expense")
     .reduce((s, t) => s + Number(t.amount), 0);
   const balance = income - expense;
@@ -110,7 +162,7 @@ function Dashboard() {
 
   const expenseByCat = useMemo(() => {
     const map = new Map<string, number>();
-    monthTx
+    periodTx
       .filter((t) => t.type === "expense" && t.category_id)
       .forEach((t) => {
         map.set(t.category_id!, (map.get(t.category_id!) ?? 0) + Number(t.amount));
@@ -121,14 +173,17 @@ function Dashboard() {
         return { name: c?.name ?? "Outros", color: c?.color ?? "#a855f7", value };
       })
       .sort((a, b) => b.value - a.value);
-  }, [monthTx, cats]);
+  }, [periodTx, cats]);
 
   const monthly = useMemo(() => {
     const buckets = new Map<string, { month: string; income: number; expense: number; key: string }>();
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = d.toISOString().slice(0, 7);
-      buckets.set(key, { month: monthLabel(d), income: 0, expense: 0, key });
+    const totalMonths = periodMonths;
+    for (let i = totalMonths - 1; i >= 0; i--) {
+      const refDate = period === "custom"
+        ? new Date(new Date(periodEnd + "T00:00:00").getFullYear(), new Date(periodEnd + "T00:00:00").getMonth() - i, 1)
+        : new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = refDate.toISOString().slice(0, 7);
+      buckets.set(key, { month: monthLabel(refDate), income: 0, expense: 0, key });
     }
     tx.forEach((t) => {
       const key = t.date.slice(0, 7);
@@ -138,21 +193,60 @@ function Dashboard() {
       else b.expense += Number(t.amount);
     });
     return Array.from(buckets.values());
-  }, [tx]);
+  }, [tx, period, periodEnd, periodMonths, now]);
 
   const recent = tx.slice(0, 6);
 
   if (loading) return <div className="text-sm text-muted-foreground">Carregando...</div>;
 
+  const periodLabel = useMemo(() => {
+    switch (period) {
+      case "1m": return "Último mês";
+      case "3m": return "Últimos 3 meses";
+      case "6m": return "Últimos 6 meses";
+      case "12m": return "Últimos 12 meses";
+      case "custom": return `${formatDate(periodStart)} a ${formatDate(periodEnd)}`;
+    }
+  }, [period, periodStart, periodEnd]);
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Visão geral</h1>
-        <p className="text-sm text-muted-foreground">Seu resumo financeiro do mês</p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Visão geral</h1>
+          <p className="text-sm text-muted-foreground">{periodLabel}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Select value={period} onValueChange={(v) => setPeriod(v as PeriodOption)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Período" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1m">Último mês</SelectItem>
+              <SelectItem value="3m">Últimos 3 meses</SelectItem>
+              <SelectItem value="6m">Últimos 6 meses</SelectItem>
+              <SelectItem value="12m">Últimos 12 meses</SelectItem>
+              <SelectItem value="custom">Personalizado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
+      {period === "custom" && (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground">De</label>
+            <Input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} max={todayISO()} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground">Até</label>
+            <Input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} max={todayISO()} />
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Saldo do mês" value={formatCurrency(balance)} icon={Wallet} accent="primary" />
+        <StatCard label="Saldo do período" value={formatCurrency(balance)} icon={Wallet} accent="primary" />
         <StatCard label="Receitas" value={formatCurrency(income)} icon={ArrowUpRight} accent="success" />
         <StatCard label="Despesas" value={formatCurrency(expense)} icon={ArrowDownRight} accent="destructive" />
         <StatCard label="Economia" value={`${savingsPct}%`} icon={PiggyBank} accent="primary" />
@@ -165,7 +259,7 @@ function Dashboard() {
           </CardHeader>
           <CardContent className="h-[280px]">
             {expenseByCat.length === 0 ? (
-              <EmptyChart label="Sem despesas neste mês" />
+              <EmptyChart label="Sem despesas no período" />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -184,7 +278,7 @@ function Dashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Receitas vs Despesas (6 meses)</CardTitle>
+            <CardTitle className="text-base">Receitas vs Despesas ({periodLabel})</CardTitle>
           </CardHeader>
           <CardContent className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
