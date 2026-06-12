@@ -58,6 +58,8 @@ function DocumentosPage() {
   const [extractions, setExtractions] = useState<Record<string, Extraction>>({});
   const [uploading, setUploading] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [processingProgress, setProcessingProgress] = useState<{ pct: number; stage: string }>({ pct: 0, stage: "" });
+
   const [openDocId, setOpenDocId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Record<string, Set<number>>>({});
   const [bulkBusy, setBulkBusy] = useState(false);
