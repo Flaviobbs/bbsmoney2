@@ -113,9 +113,14 @@ function TransactionsPage() {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"all" | "income" | "expense">("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [groupBy, setGroupBy] = useState<"category" | "month">("category");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Tx | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkCategoryId, setBulkCategoryId] = useState<string>("");
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   const load = async () => {
     const [{ data: t }, { data: c }, { data: a }] = await Promise.all([
@@ -126,6 +131,7 @@ function TransactionsPage() {
     setTx((t ?? []) as Tx[]);
     setCats((c ?? []) as Cat[]);
     setAccs((a ?? []) as Acc[]);
+    setSelected(new Set());
   };
 
   useEffect(() => {
@@ -161,7 +167,84 @@ function TransactionsPage() {
     return true;
   });
 
+  const toggleOne = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const toggleAllVisible = () => {
+    setSelected((prev) => {
+      const visibleIds = filtered.map((t) => t.id);
+      const allSelected = visibleIds.every((id) => prev.has(id));
+      const next = new Set(prev);
+      if (allSelected) visibleIds.forEach((id) => next.delete(id));
+      else visibleIds.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
+  const bulkDelete = async () => {
+    if (selected.size === 0) return;
+    const ids = Array.from(selected);
+    const { error } = await supabase.from("transactions").delete().in("id", ids);
+    if (error) return toast.error(error.message);
+    toast.success(`${ids.length} transaç${ids.length === 1 ? "ão" : "ões"} excluída(s)`);
+    load();
+  };
+
+  const bulkApplyCategory = async () => {
+    if (selected.size === 0) return;
+    const ids = Array.from(selected);
+    setBulkSaving(true);
+    const newCatId = bulkCategoryId === "__none__" ? null : bulkCategoryId || null;
+    const { error } = await supabase
+      .from("transactions")
+      .update({ category_id: newCatId })
+      .in("id", ids);
+    setBulkSaving(false);
+    if (error) return toast.error(error.message);
+    // Aprende para cada transação afetada
+    const catName = newCatId ? cats.find((c) => c.id === newCatId)?.name : null;
+    if (catName) {
+      for (const id of ids) {
+        const t = tx.find((x) => x.id === id);
+        if (!t || !t.description?.trim()) continue;
+        try {
+          learnCategory(t.description, Number(t.amount), catName);
+        } catch (_) {
+          /* ignora */
+        }
+      }
+    }
+    toast.success(`Categoria aplicada a ${ids.length} transaç${ids.length === 1 ? "ão" : "ões"}`);
+    setBulkOpen(false);
+    setBulkCategoryId("");
+    load();
+  };
+
   const groups = useMemo(() => {
+    if (groupBy === "month") {
+      const map = new Map<
+        string,
+        { key: string; name: string; color: string; items: Tx[]; income: number; expense: number }
+      >();
+      for (const t of filtered) {
+        const key = t.date.slice(0, 7); // YYYY-MM
+        if (!map.has(key)) {
+          map.set(key, { key, name: MONTH_LABEL(key), color: "#a855f7", items: [], income: 0, expense: 0 });
+        }
+        const g = map.get(key)!;
+        g.items.push(t);
+        if (t.type === "income") g.income += Number(t.amount);
+        else g.expense += Number(t.amount);
+      }
+      return Array.from(map.entries())
+        .sort((a, b) => (a[0] < b[0] ? 1 : -1)) // mais recentes primeiro
+        .map(([k, g]) => [k, { categoryId: null as string | null, ...g }] as const);
+    }
     const map = new Map<
       string,
       { categoryId: string | null; name: string; color: string; items: Tx[]; income: number; expense: number }
@@ -179,13 +262,16 @@ function TransactionsPage() {
       if (t.type === "income") g.income += Number(t.amount);
       else g.expense += Number(t.amount);
     }
-    // ordena por valor total (desc) — categorias com maior movimento primeiro
     return Array.from(map.entries()).sort((a, b) => {
       const aTotal = a[1].income + a[1].expense;
       const bTotal = b[1].income + b[1].expense;
       return bTotal - aTotal;
     });
-  }, [filtered, cats]);
+  }, [filtered, cats, groupBy]);
+
+  const allVisibleSelected =
+    filtered.length > 0 && filtered.every((t) => selected.has(t.id));
+
 
   return (
     <div className="space-y-6">
