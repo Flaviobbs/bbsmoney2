@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, Search, ChevronDown, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Search, ChevronDown, AlertTriangle, Tag } from "lucide-react";
 import { formatCurrency, todayISO } from "@/lib/format";
 import { toast } from "sonner";
 import {
@@ -41,6 +41,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { learnCategory } from "@/services/invoiceProcessor";
+
 
 export const Route = createFileRoute("/app/transacoes")({
   component: TransactionsPage,
@@ -111,9 +113,14 @@ function TransactionsPage() {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"all" | "income" | "expense">("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [groupBy, setGroupBy] = useState<"category" | "month">("category");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Tx | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkCategoryId, setBulkCategoryId] = useState<string>("");
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   const load = async () => {
     const [{ data: t }, { data: c }, { data: a }] = await Promise.all([
@@ -124,6 +131,7 @@ function TransactionsPage() {
     setTx((t ?? []) as Tx[]);
     setCats((c ?? []) as Cat[]);
     setAccs((a ?? []) as Acc[]);
+    setSelected(new Set());
   };
 
   useEffect(() => {
@@ -159,7 +167,84 @@ function TransactionsPage() {
     return true;
   });
 
+  const toggleOne = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const toggleAllVisible = () => {
+    setSelected((prev) => {
+      const visibleIds = filtered.map((t) => t.id);
+      const allSelected = visibleIds.every((id) => prev.has(id));
+      const next = new Set(prev);
+      if (allSelected) visibleIds.forEach((id) => next.delete(id));
+      else visibleIds.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
+  const bulkDelete = async () => {
+    if (selected.size === 0) return;
+    const ids = Array.from(selected);
+    const { error } = await supabase.from("transactions").delete().in("id", ids);
+    if (error) return toast.error(error.message);
+    toast.success(`${ids.length} transaç${ids.length === 1 ? "ão" : "ões"} excluída(s)`);
+    load();
+  };
+
+  const bulkApplyCategory = async () => {
+    if (selected.size === 0) return;
+    const ids = Array.from(selected);
+    setBulkSaving(true);
+    const newCatId = bulkCategoryId === "__none__" ? null : bulkCategoryId || null;
+    const { error } = await supabase
+      .from("transactions")
+      .update({ category_id: newCatId })
+      .in("id", ids);
+    setBulkSaving(false);
+    if (error) return toast.error(error.message);
+    // Aprende para cada transação afetada
+    const catName = newCatId ? cats.find((c) => c.id === newCatId)?.name : null;
+    if (catName) {
+      for (const id of ids) {
+        const t = tx.find((x) => x.id === id);
+        if (!t || !t.description?.trim()) continue;
+        try {
+          learnCategory(t.description, Number(t.amount), catName);
+        } catch (_) {
+          /* ignora */
+        }
+      }
+    }
+    toast.success(`Categoria aplicada a ${ids.length} transaç${ids.length === 1 ? "ão" : "ões"}`);
+    setBulkOpen(false);
+    setBulkCategoryId("");
+    load();
+  };
+
   const groups = useMemo(() => {
+    if (groupBy === "month") {
+      const map = new Map<
+        string,
+        { key: string; name: string; color: string; items: Tx[]; income: number; expense: number }
+      >();
+      for (const t of filtered) {
+        const key = t.date.slice(0, 7); // YYYY-MM
+        if (!map.has(key)) {
+          map.set(key, { key, name: MONTH_LABEL(key), color: "#a855f7", items: [], income: 0, expense: 0 });
+        }
+        const g = map.get(key)!;
+        g.items.push(t);
+        if (t.type === "income") g.income += Number(t.amount);
+        else g.expense += Number(t.amount);
+      }
+      return Array.from(map.entries())
+        .sort((a, b) => (a[0] < b[0] ? 1 : -1)) // mais recentes primeiro
+        .map(([k, g]) => [k, { categoryId: null as string | null, ...g }] as const);
+    }
     const map = new Map<
       string,
       { categoryId: string | null; name: string; color: string; items: Tx[]; income: number; expense: number }
@@ -177,13 +262,16 @@ function TransactionsPage() {
       if (t.type === "income") g.income += Number(t.amount);
       else g.expense += Number(t.amount);
     }
-    // ordena por valor total (desc) — categorias com maior movimento primeiro
     return Array.from(map.entries()).sort((a, b) => {
       const aTotal = a[1].income + a[1].expense;
       const bTotal = b[1].income + b[1].expense;
       return bTotal - aTotal;
     });
-  }, [filtered, cats]);
+  }, [filtered, cats, groupBy]);
+
+  const allVisibleSelected =
+    filtered.length > 0 && filtered.every((t) => selected.has(t.id));
+
 
   return (
     <div className="space-y-6">
@@ -296,7 +384,93 @@ function TransactionsPage() {
               ))}
           </SelectContent>
         </Select>
+        <Select value={groupBy} onValueChange={(v) => setGroupBy(v as "category" | "month")}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Agrupar por" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="category">Agrupar por categoria</SelectItem>
+            <SelectItem value="month">Agrupar por mês</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
+
+      {filtered.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <Checkbox checked={allVisibleSelected} onCheckedChange={toggleAllVisible} />
+            <span className="text-xs text-muted-foreground">
+              {selected.size === 0
+                ? `Selecionar todas (${filtered.length})`
+                : `${selected.size} selecionada${selected.size === 1 ? "" : "s"}`}
+            </span>
+          </label>
+          <div className="ml-auto flex gap-2">
+            <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline" disabled={selected.size === 0}>
+                  <Tag className="mr-1 h-4 w-4" /> Mudar categoria
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>
+                    Mudar categoria de {selected.size} transaç{selected.size === 1 ? "ão" : "ões"}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <Label>Categoria</Label>
+                  <Select value={bulkCategoryId} onValueChange={setBulkCategoryId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecionar..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Sem categoria</SelectItem>
+                      {buildCatTree(cats).map(({ cat: c, depth }) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          <span className="inline-flex items-center gap-2">
+                            {depth > 0 && <span className="text-muted-foreground">↳</span>}
+                            <span
+                              className="h-2.5 w-2.5 rounded-full"
+                              style={{ backgroundColor: c.color }}
+                            />
+                            {c.name} <span className="text-xs text-muted-foreground">({c.type === "income" ? "Receita" : "Despesa"})</span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setBulkOpen(false)}>Cancelar</Button>
+                  <Button onClick={bulkApplyCategory} disabled={bulkSaving || !bulkCategoryId}>
+                    {bulkSaving ? "Aplicando..." : "Aplicar"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="outline" disabled={selected.size === 0}>
+                  <Trash2 className="mr-1 h-4 w-4 text-destructive" /> Excluir
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Excluir {selected.size} transaç{selected.size === 1 ? "ão" : "ões"}?</AlertDialogTitle>
+                  <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={bulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Excluir
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+      )}
 
       {groups.length === 0 ? (
         <Card>
@@ -349,6 +523,11 @@ function TransactionsPage() {
                             key={t.id}
                             className="flex items-center justify-between gap-3 px-4 py-3"
                           >
+                            <Checkbox
+                              checked={selected.has(t.id)}
+                              onCheckedChange={() => toggleOne(t.id)}
+                              onClick={(e) => e.stopPropagation()}
+                            />
                             <button
                               type="button"
                               onClick={() => setEditing(t)}
@@ -392,6 +571,7 @@ function TransactionsPage() {
           })}
         </div>
       )}
+
 
       <EditCategoryDialog
         tx={editing}
@@ -504,6 +684,18 @@ function EditCategoryDialog({
     setSaving(false);
     if (error) return toast.error(error.message);
     const count = updated?.length ?? 0;
+    // Aprende essa categorização para futuras importações de PDF
+    if (finalCategoryId && desc) {
+      const catName = cats.find((c) => c.id === finalCategoryId)?.name
+        ?? (creating ? newName.trim() : null);
+      if (catName) {
+        try {
+          learnCategory(desc, Number(tx.amount), catName);
+        } catch (_) {
+          /* ignora */
+        }
+      }
+    }
     toast.success(
       applyAll && desc
         ? `Atualizado em ${count} transaç${count === 1 ? "ão" : "ões"}`
@@ -511,6 +703,7 @@ function EditCategoryDialog({
     );
     onSaved();
   };
+
 
 
   return (

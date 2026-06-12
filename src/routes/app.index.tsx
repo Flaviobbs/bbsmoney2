@@ -76,16 +76,17 @@ function Dashboard() {
     const d = new Date();
     switch (period) {
       case "1m":
-        d.setMonth(d.getMonth() - 1);
-        break;
+        // mês corrente: do dia 1 até hoje
+        d.setDate(1);
+        return d.toISOString().slice(0, 10);
       case "3m":
-        d.setMonth(d.getMonth() - 3);
+        d.setMonth(d.getMonth() - 2);
         break;
       case "6m":
-        d.setMonth(d.getMonth() - 6);
+        d.setMonth(d.getMonth() - 5);
         break;
       case "12m":
-        d.setMonth(d.getMonth() - 12);
+        d.setMonth(d.getMonth() - 11);
         break;
       case "custom":
         return customStart;
@@ -93,6 +94,7 @@ function Dashboard() {
     d.setDate(1);
     return d.toISOString().slice(0, 10);
   }, [period, customStart]);
+
 
   const periodEnd = useMemo(() => {
     if (period === "custom") return customEnd;
@@ -201,13 +203,14 @@ function Dashboard() {
 
   const periodLabel = useMemo(() => {
     switch (period) {
-      case "1m": return "Último mês";
+      case "1m": return "Mês corrente";
       case "3m": return "Últimos 3 meses";
       case "6m": return "Últimos 6 meses";
       case "12m": return "Últimos 12 meses";
       case "custom": return `${formatDate(periodStart)} a ${formatDate(periodEnd)}`;
     }
   }, [period, periodStart, periodEnd]);
+
 
   return (
     <div className="space-y-6">
@@ -222,7 +225,7 @@ function Dashboard() {
               <SelectValue placeholder="Período" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="1m">Último mês</SelectItem>
+              <SelectItem value="1m">Mês corrente</SelectItem>
               <SelectItem value="3m">Últimos 3 meses</SelectItem>
               <SelectItem value="6m">Últimos 6 meses</SelectItem>
               <SelectItem value="12m">Últimos 12 meses</SelectItem>

@@ -40,15 +40,33 @@ export const Route = createFileRoute("/api/insights/generate")({
         const userId = claimsData.claims.sub;
 
         const now = new Date();
-        const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
+        const defaultStart = new Date(now.getFullYear(), now.getMonth(), 1)
           .toISOString()
           .slice(0, 10);
-        const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+        const defaultEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
           .toISOString()
           .slice(0, 10);
-        const prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-          .toISOString()
-          .slice(0, 10);
+
+        let bodyPeriodStart: string | null = null;
+        let bodyPeriodEnd: string | null = null;
+        try {
+          const body = (await request.json().catch(() => null)) as
+            | { period_start?: string; period_end?: string }
+            | null;
+          const iso = /^\d{4}-\d{2}-\d{2}$/;
+          if (body?.period_start && iso.test(body.period_start)) bodyPeriodStart = body.period_start;
+          if (body?.period_end && iso.test(body.period_end)) bodyPeriodEnd = body.period_end;
+        } catch {
+          /* sem body = usa mês corrente */
+        }
+
+        const periodStart = bodyPeriodStart ?? defaultStart;
+        const periodEnd = bodyPeriodEnd ?? defaultEnd;
+        // janela anterior do mesmo tamanho para comparação
+        const startMs = new Date(periodStart + "T00:00:00").getTime();
+        const endMs = new Date(periodEnd + "T00:00:00").getTime();
+        const spanMs = Math.max(endMs - startMs, 24 * 60 * 60 * 1000);
+        const prevStart = new Date(startMs - spanMs).toISOString().slice(0, 10);
 
         const [{ data: tx }, { data: cats }, { data: budgets }] = await Promise.all([
           supabase
@@ -62,6 +80,7 @@ export const Route = createFileRoute("/api/insights/generate")({
             .select("category_id,limit_amount")
             .eq("month", periodStart),
         ]);
+
 
         const txs = tx ?? [];
         const catMap = new Map((cats ?? []).map((c) => [c.id, c.name]));
@@ -100,19 +119,20 @@ export const Route = createFileRoute("/api/insights/generate")({
 
         const aggregated = {
           periodo: { inicio: periodStart, fim: periodEnd },
-          mes_atual: {
+          periodo_atual: {
             receitas: Math.round(incomeCur * 100) / 100,
             despesas: Math.round(expenseCur * 100) / 100,
             saldo: Math.round((incomeCur - expenseCur) * 100) / 100,
           },
-          mes_anterior: {
+          periodo_anterior: {
             receitas: Math.round(incomePrev * 100) / 100,
             despesas: Math.round(expensePrev * 100) / 100,
           },
           top_categorias_despesa: topCategories,
           orcamentos: budgetsAgg,
-          total_transacoes_mes: cur.length,
+          total_transacoes_periodo: cur.length,
         };
+
 
         const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
