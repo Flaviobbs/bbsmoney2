@@ -221,6 +221,25 @@ function SettingsPage() {
         </CardContent>
       </Card>
 
+      <Card className="max-w-xl">
+        <CardHeader>
+          <CardTitle className="text-base">Backup dos dados</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Baixe um arquivo JSON com tudo que você cadastrou (transações, categorias,
+            contas, contas a pagar, orçamentos, metas, insights, documentos e aprendizado
+            de categorias). Guarde antes de cada atualização importante para nunca perder
+            o trabalho de processamento.
+          </p>
+          <Button onClick={downloadBackup} disabled={backupBusy}>
+            {backupBusy ? "Gerando backup..." : "Baixar backup (JSON)"}
+          </Button>
+        </CardContent>
+      </Card>
+
+
+
       <Card className="max-w-2xl">
         <CardHeader>
           <CardTitle className="text-base">WhatsApp simulado</CardTitle>
