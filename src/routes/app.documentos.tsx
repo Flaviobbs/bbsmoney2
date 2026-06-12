@@ -285,8 +285,10 @@ function DocumentosPage() {
       merchant: sug.comerciante ?? null,
     });
     if (error) return toast.error(error.message);
+    try { if (sug.categoria) learnCategory(sug.descricao, Number(sug.valor), sug.categoria); } catch (_) {}
     toast.success("Transação criada");
     rejectSuggestion(docId, idx);
+
   };
 
   const approve = async (docId: string, sug: Suggestion, idx: number) => {
