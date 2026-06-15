@@ -558,7 +558,8 @@ function TransactionsPage() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {groups.map(([key, g]) => {
+          {groups.map((g) => {
+            const key = g.key;
             const isOpen = !collapsed[key];
             const balance = g.income - g.expense;
             return (
@@ -580,7 +581,7 @@ function TransactionsPage() {
                       />
                       <span className="font-semibold">{g.name}</span>
                       <span className="text-xs text-muted-foreground">
-                        ({g.items.length} {g.items.length === 1 ? "lançamento" : "lançamentos"})
+                        ({g.count} {g.count === 1 ? "lançamento" : "lançamentos"})
                       </span>
                     </div>
                     <div
@@ -593,60 +594,106 @@ function TransactionsPage() {
                     </div>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <ul className="divide-y divide-border/50 border-t">
-                      {g.items.map((t) => {
-                        const cat = cats.find((c) => c.id === t.category_id);
+                    <div className="divide-y divide-border/50 border-t">
+                      {g.subgroups.map((sg) => {
+                        const subKey = `${key}::${sg.key}`;
+                        const subOpen = !collapsed[subKey];
+                        const subBalance = sg.income - sg.expense;
                         return (
-                          <li
-                            key={t.id}
-                            className="flex items-center justify-between gap-3 px-4 py-3"
-                          >
-                            <Checkbox
-                              checked={selected.has(t.id)}
-                              onCheckedChange={() => toggleOne(t.id)}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setEditing(t)}
-                              className="flex min-w-0 flex-1 items-center gap-3 text-left hover:opacity-80"
+                          <div key={subKey} className="bg-muted/10">
+                            <Collapsible
+                              open={subOpen}
+                              onOpenChange={(v) =>
+                                setCollapsed((s) => ({ ...s, [subKey]: !v }))
+                              }
                             >
-                              <span
-                                className="h-2.5 w-2.5 shrink-0 rounded-full"
-                                style={{ backgroundColor: cat?.color ?? "#64748b" }}
-                              />
-                              <div className="min-w-0">
-                                <div className="truncate text-sm font-medium">
-                                  {t.description || cat?.name || "Sem descrição"}
+                              <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-6 py-2 text-sm hover:bg-muted/40">
+                                <div className="flex items-center gap-2">
+                                  <ChevronDown
+                                    className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${
+                                      subOpen ? "" : "-rotate-90"
+                                    }`}
+                                  />
+                                  <span
+                                    className="h-2 w-2 shrink-0 rounded-full"
+                                    style={{ backgroundColor: sg.color }}
+                                  />
+                                  <span className="font-medium">{sg.name}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    ({sg.items.length})
+                                  </span>
                                 </div>
-                                <div className="text-xs text-muted-foreground">
-                                  {catFullName(cat, cats)} •{" "}
-                                  {new Date(t.date + "T00:00:00").toLocaleDateString("pt-BR")}
+                                <div
+                                  className={`tabular-nums text-xs font-semibold ${
+                                    subBalance >= 0 ? "text-success" : "text-destructive"
+                                  }`}
+                                >
+                                  {subBalance >= 0 ? "+" : "−"}
+                                  {formatCurrency(Math.abs(subBalance))}
                                 </div>
-                              </div>
-                            </button>
-                            <div className="flex items-center gap-3">
-                              <div
-                                className={`tabular-nums font-semibold ${
-                                  t.type === "income" ? "text-success" : "text-destructive"
-                                }`}
-                              >
-                                {t.type === "income" ? "+" : "−"}
-                                {formatCurrency(Number(t.amount))}
-                              </div>
-                              <Button size="icon" variant="ghost" onClick={() => remove(t.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </li>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <ul className="divide-y divide-border/50 border-t bg-background">
+                                  {sg.items.map((t: Tx) => {
+                                    const cat = cats.find((c) => c.id === t.category_id);
+                                    return (
+                                      <li
+                                        key={t.id}
+                                        className="flex items-center justify-between gap-3 px-8 py-3"
+                                      >
+                                        <Checkbox
+                                          checked={selected.has(t.id)}
+                                          onCheckedChange={() => toggleOne(t.id)}
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => setEditing(t)}
+                                          className="flex min-w-0 flex-1 items-center gap-3 text-left hover:opacity-80"
+                                        >
+                                          <span
+                                            className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                            style={{ backgroundColor: cat?.color ?? "#64748b" }}
+                                          />
+                                          <div className="min-w-0">
+                                            <div className="truncate text-sm font-medium">
+                                              {t.description || cat?.name || "Sem descrição"}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                              {catFullName(cat, cats)} •{" "}
+                                              {new Date(t.date + "T00:00:00").toLocaleDateString("pt-BR")}
+                                            </div>
+                                          </div>
+                                        </button>
+                                        <div className="flex items-center gap-3">
+                                          <div
+                                            className={`tabular-nums font-semibold ${
+                                              t.type === "income" ? "text-success" : "text-destructive"
+                                            }`}
+                                          >
+                                            {t.type === "income" ? "+" : "−"}
+                                            {formatCurrency(Number(t.amount))}
+                                          </div>
+                                          <Button size="icon" variant="ghost" onClick={() => remove(t.id)}>
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </CollapsibleContent>
+                            </Collapsible>
+                          </div>
                         );
                       })}
-                    </ul>
+                    </div>
                   </CollapsibleContent>
                 </Collapsible>
               </Card>
             );
           })}
+
         </div>
       )}
 
