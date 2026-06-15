@@ -283,6 +283,30 @@ export function buildLearningKey(description: string, value: number): string {
   return `${norm}-${Math.round(value)}`;
 }
 
+// Padrões que poluem o "nome" do comerciante e devem ser removidos antes de gerar a assinatura.
+const NOISE_PATTERNS: RegExp[] = [
+  /parcela\s*\d{1,3}\s*(?:de|\/)\s*\d{1,3}/gi,
+  /parc\.?\s*\d{1,3}\s*[\/.\-]\s*\d{1,3}/gi,
+  /pcl\.?\s*\d{1,3}\s*[\/.\-]\s*\d{1,3}/gi,
+  /\bp[xX]?\.?\s*\d{1,3}\s*\/\s*\d{1,3}\b/gi,
+  /[\(\[\{]\s*\d{1,3}\s*\/\s*\d{1,3}\s*[\)\]\}]/g,
+  /\b\d{1,3}\s*\/\s*\d{1,3}\b/g,
+  /\b\d{1,2}[\/\-.]\d{1,2}(?:[\/\-.]\d{2,4})?\b/g, // datas
+  /\br\$\s*\d[\d.,]*/gi,
+];
+
+/**
+ * Assinatura estável de um comerciante: remove parcelas, datas, valores e
+ * tokens genéricos. Usada como chave secundária de aprendizado para que a
+ * mesma loja seja reconhecida em compras futuras com valor/parcela diferentes.
+ */
+export function merchantSignature(description: string): string {
+  if (!description) return "";
+  let s = description;
+  for (const re of NOISE_PATTERNS) s = s.replace(re, " ");
+  return tokenize(s).slice(0, 4).join(" ");
+}
+
 export interface SuggestionResult {
   category: string | null;
   confidence: SuggestionConfidence;
@@ -305,10 +329,26 @@ export function suggestCategoryDetailed(
     return { category: data[exactKey].category, confidence: "alta", source: "aprendizado", score: 1 };
   }
 
+  // 2) match por assinatura de comerciante (ignora valor/parcela)
+  const sig = merchantSignature(description);
+  if (sig) {
+    const sigMatches: CategoryLearning[] = [];
+    for (const entry of Object.values(data)) {
+      if (entry.signature && entry.signature === sig) sigMatches.push(entry);
+    }
+    if (sigMatches.length > 0) {
+      // pega a categoria com maior frequência somada
+      const totals: Record<string, number> = {};
+      for (const e of sigMatches) totals[e.category] = (totals[e.category] ?? 0) + e.frequency;
+      const [bestCat] = Object.entries(totals).sort((a, b) => b[1] - a[1])[0];
+      return { category: bestCat, confidence: "alta", source: "aprendizado", score: 0.95 };
+    }
+  }
+
   const queryTokens = tokenize(description);
   const querySet = new Set(queryTokens);
 
-  // 2) match por token nas regras aprendidas
+  // 3) match por token nas regras aprendidas (jaccard puro, sem penalizar entradas novas)
   let best: { entry: CategoryLearning; score: number } | null = null;
   if (queryTokens.length > 0) {
     for (const entry of Object.values(data)) {
@@ -317,12 +357,14 @@ export function suggestCategoryDetailed(
       const learnedSet = new Set(learnedTokens);
       let intersection = 0;
       for (const t of learnedSet) if (querySet.has(t)) intersection++;
+      if (intersection === 0) continue;
       const unionSize = new Set([...querySet, ...learnedSet]).size;
       if (unionSize === 0) continue;
       const jaccard = intersection / unionSize;
       const rootMatch =
         learnedTokens[0] && queryTokens[0] && learnedTokens[0] === queryTokens[0] ? 0.15 : 0;
-      const combined = (jaccard + rootMatch) * Math.log2(1 + entry.frequency);
+      const freqBoost = Math.min(0.2, entry.frequency * 0.05);
+      const combined = jaccard + rootMatch + freqBoost;
       if (!best || combined > best.score) {
         best = { entry, score: combined };
       }
@@ -330,11 +372,11 @@ export function suggestCategoryDetailed(
   }
 
   if (best && best.score >= SCORE_THRESHOLD) {
-    const confidence: SuggestionConfidence = best.score >= 1 ? "alta" : best.score >= 0.7 ? "media" : "baixa";
+    const confidence: SuggestionConfidence = best.score >= 0.9 ? "alta" : best.score >= 0.6 ? "media" : "baixa";
     return { category: best.entry.category, confidence, source: "aprendizado", score: best.score };
   }
 
-  // 3) fallback: catálogo de keywords de comerciantes conhecidos
+  // 4) fallback: catálogo de keywords de comerciantes conhecidos
   const keywordCategory = suggestCategoryByKeyword(description);
   if (keywordCategory) {
     return { category: keywordCategory, confidence: "media", source: "keyword", score: 0.6 };
@@ -360,6 +402,7 @@ export function learnCategory(
   const key = buildLearningKey(description, value);
   const existing = store[key];
   const tokens = tokenize(description);
+  const signature = merchantSignature(description);
   const next: CategoryLearning = {
     category,
     frequency:
@@ -368,8 +411,25 @@ export function learnCategory(
         : (existing?.frequency ?? 0) + 1,
     lastUpdated: new Date().toISOString(),
     tokens,
+    signature: signature || undefined,
   };
   store[key] = next;
+
+  // Reforça/atualiza todas as entradas existentes com a mesma assinatura para
+  // refletir a categoria mais recente escolhida manualmente pelo usuário.
+  if (signature) {
+    for (const [k, entry] of Object.entries(store)) {
+      if (k === key) continue;
+      if (entry.signature === signature && entry.category !== category) {
+        store[k] = {
+          ...entry,
+          category,
+          lastUpdated: new Date().toISOString(),
+        };
+      }
+    }
+  }
+
   writeLearningStore(store);
   return store;
 }

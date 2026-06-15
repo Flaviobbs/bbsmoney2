@@ -67,6 +67,7 @@ export interface CategoryLearning {
   frequency: number;
   lastUpdated: string;
   tokens?: string[]; // tokens normalizados da descrição
+  signature?: string; // assinatura do comerciante (sem parcela/data/valor)
 }
 
 export type CategoryLearningStore = Record<string, CategoryLearning>;
