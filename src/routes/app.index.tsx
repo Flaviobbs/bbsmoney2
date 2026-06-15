@@ -199,8 +199,6 @@ function Dashboard() {
 
   const recent = tx.slice(0, 6);
 
-  if (loading) return <div className="text-sm text-muted-foreground">Carregando...</div>;
-
   const periodLabel = useMemo(() => {
     switch (period) {
       case "1m": return "Mês corrente";
@@ -210,6 +208,10 @@ function Dashboard() {
       case "custom": return `${formatDate(periodStart)} a ${formatDate(periodEnd)}`;
     }
   }, [period, periodStart, periodEnd]);
+
+  if (loading) return <div className="text-sm text-muted-foreground">Carregando...</div>;
+
+
 
 
   return (
