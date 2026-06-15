@@ -156,12 +156,33 @@ function TransactionsPage() {
     load();
   };
 
+  // Mapas auxiliares para resolver hierarquia de categorias
+  const catMap = useMemo(() => {
+    const m = new Map<string, Cat>();
+    cats.forEach((c) => m.set(c.id, c));
+    return m;
+  }, [cats]);
+
+  const rootCatId = (cid: string | null): string | null => {
+    if (!cid) return null;
+    const c = catMap.get(cid);
+    if (!c) return cid;
+    return c.parent_id ?? c.id;
+  };
+
   const filtered = tx.filter((t) => {
     if (filterType !== "all" && t.type !== filterType) return false;
     if (filterCategory !== "all") {
       if (filterCategory === "__none__") {
         if (t.category_id) return false;
-      } else if (t.category_id !== filterCategory) return false;
+      } else {
+        // Aceita a própria categoria OU qualquer subcategoria dela
+        const tCat = t.category_id ? catMap.get(t.category_id) : undefined;
+        const matches =
+          t.category_id === filterCategory ||
+          tCat?.parent_id === filterCategory;
+        if (!matches) return false;
+      }
     }
     if (search && !t.description.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
@@ -206,7 +227,6 @@ function TransactionsPage() {
       .in("id", ids);
     setBulkSaving(false);
     if (error) return toast.error(error.message);
-    // Aprende para cada transação afetada
     const catName = newCatId ? cats.find((c) => c.id === newCatId)?.name : null;
     if (catName) {
       for (const id of ids) {
@@ -225,49 +245,107 @@ function TransactionsPage() {
     load();
   };
 
-  const groups = useMemo(() => {
-    if (groupBy === "month") {
-      const map = new Map<
-        string,
-        { key: string; name: string; color: string; items: Tx[]; income: number; expense: number }
-      >();
-      for (const t of filtered) {
-        const key = t.date.slice(0, 7); // YYYY-MM
-        if (!map.has(key)) {
-          map.set(key, { key, name: MONTH_LABEL(key), color: "#a855f7", items: [], income: 0, expense: 0 });
-        }
-        const g = map.get(key)!;
-        g.items.push(t);
-        if (t.type === "income") g.income += Number(t.amount);
-        else g.expense += Number(t.amount);
-      }
-      return Array.from(map.entries())
-        .sort((a, b) => (a[0] < b[0] ? 1 : -1)) // mais recentes primeiro
-        .map(([k, g]) => [k, { categoryId: null as string | null, ...g }] as const);
-    }
-    const map = new Map<
-      string,
-      { categoryId: string | null; name: string; color: string; items: Tx[]; income: number; expense: number }
-    >();
+  // Agrupamento hierárquico: primário + secundário
+  type SubGroup = {
+    key: string;
+    name: string;
+    color: string;
+    items: Tx[];
+    income: number;
+    expense: number;
+  };
+  type Group = {
+    key: string;
+    name: string;
+    color: string;
+    income: number;
+    expense: number;
+    count: number;
+    subgroups: SubGroup[];
+  };
+
+  const groups = useMemo<Group[]>(() => {
+    // Chave/nome/cor para a dimensão "categoria" (rolando subcategorias no pai)
+    const categoryKeyOf = (t: Tx) => {
+      const rid = rootCatId(t.category_id);
+      if (!rid) return { key: "__none__", name: "Sem categoria", color: "#64748b" };
+      const c = catMap.get(rid);
+      return { key: rid, name: c?.name ?? "Sem categoria", color: c?.color ?? "#64748b" };
+    };
+    const monthKeyOf = (t: Tx) => {
+      const key = t.date.slice(0, 7);
+      return { key, name: MONTH_LABEL(key), color: "#a855f7" };
+    };
+
+    const primaryFn = groupBy === "month" ? monthKeyOf : categoryKeyOf;
+    const secondaryFn = groupBy === "month" ? categoryKeyOf : monthKeyOf;
+
+    const primaryMap = new Map<string, Group & { _subMap: Map<string, SubGroup> }>();
     for (const t of filtered) {
-      const cat = cats.find((c) => c.id === t.category_id);
-      const key = t.category_id ?? "__none__";
-      const name = cat ? catFullName(cat, cats) : "Sem categoria";
-      const color = cat?.color ?? "#64748b";
-      if (!map.has(key)) {
-        map.set(key, { categoryId: t.category_id, name, color, items: [], income: 0, expense: 0 });
+      const p = primaryFn(t);
+      let g = primaryMap.get(p.key);
+      if (!g) {
+        g = {
+          key: p.key,
+          name: p.name,
+          color: p.color,
+          income: 0,
+          expense: 0,
+          count: 0,
+          subgroups: [],
+          _subMap: new Map(),
+        };
+        primaryMap.set(p.key, g);
       }
-      const g = map.get(key)!;
-      g.items.push(t);
-      if (t.type === "income") g.income += Number(t.amount);
-      else g.expense += Number(t.amount);
+      const s = secondaryFn(t);
+      let sg = g._subMap.get(s.key);
+      if (!sg) {
+        sg = { key: s.key, name: s.name, color: s.color, items: [], income: 0, expense: 0 };
+        g._subMap.set(s.key, sg);
+      }
+      sg.items.push(t);
+      g.count += 1;
+      if (t.type === "income") {
+        g.income += Number(t.amount);
+        sg.income += Number(t.amount);
+      } else {
+        g.expense += Number(t.amount);
+        sg.expense += Number(t.amount);
+      }
     }
-    return Array.from(map.entries()).sort((a, b) => {
-      const aTotal = a[1].income + a[1].expense;
-      const bTotal = b[1].income + b[1].expense;
-      return bTotal - aTotal;
+
+    const arr: Group[] = Array.from(primaryMap.values()).map((g) => {
+      const subgroups = Array.from(g._subMap.values()).sort((a, b) => {
+        if (groupBy === "month") {
+          // dentro de um mês: categorias por maior gasto
+          return b.expense + b.income - (a.expense + a.income);
+        }
+        // dentro de uma categoria: meses mais recentes primeiro
+        return a.key < b.key ? 1 : -1;
+      });
+      // ordena itens por data desc dentro de cada subgrupo
+      subgroups.forEach((s) =>
+        s.items.sort((a, b) => (a.date < b.date ? 1 : -1)),
+      );
+      return {
+        key: g.key,
+        name: g.name,
+        color: g.color,
+        income: g.income,
+        expense: g.expense,
+        count: g.count,
+        subgroups,
+      };
     });
-  }, [filtered, cats, groupBy]);
+
+    if (groupBy === "month") {
+      arr.sort((a, b) => (a.key < b.key ? 1 : -1)); // mais recente primeiro
+    } else {
+      arr.sort((a, b) => b.income + b.expense - (a.income + a.expense));
+    }
+    return arr;
+  }, [filtered, cats, catMap, groupBy]);
+
 
   const allVisibleSelected =
     filtered.length > 0 && filtered.every((t) => selected.has(t.id));
@@ -480,7 +558,8 @@ function TransactionsPage() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {groups.map(([key, g]) => {
+          {groups.map((g) => {
+            const key = g.key;
             const isOpen = !collapsed[key];
             const balance = g.income - g.expense;
             return (
@@ -502,7 +581,7 @@ function TransactionsPage() {
                       />
                       <span className="font-semibold">{g.name}</span>
                       <span className="text-xs text-muted-foreground">
-                        ({g.items.length} {g.items.length === 1 ? "lançamento" : "lançamentos"})
+                        ({g.count} {g.count === 1 ? "lançamento" : "lançamentos"})
                       </span>
                     </div>
                     <div
@@ -515,60 +594,106 @@ function TransactionsPage() {
                     </div>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <ul className="divide-y divide-border/50 border-t">
-                      {g.items.map((t) => {
-                        const cat = cats.find((c) => c.id === t.category_id);
+                    <div className="divide-y divide-border/50 border-t">
+                      {g.subgroups.map((sg) => {
+                        const subKey = `${key}::${sg.key}`;
+                        const subOpen = !collapsed[subKey];
+                        const subBalance = sg.income - sg.expense;
                         return (
-                          <li
-                            key={t.id}
-                            className="flex items-center justify-between gap-3 px-4 py-3"
-                          >
-                            <Checkbox
-                              checked={selected.has(t.id)}
-                              onCheckedChange={() => toggleOne(t.id)}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setEditing(t)}
-                              className="flex min-w-0 flex-1 items-center gap-3 text-left hover:opacity-80"
+                          <div key={subKey} className="bg-muted/10">
+                            <Collapsible
+                              open={subOpen}
+                              onOpenChange={(v) =>
+                                setCollapsed((s) => ({ ...s, [subKey]: !v }))
+                              }
                             >
-                              <span
-                                className="h-2.5 w-2.5 shrink-0 rounded-full"
-                                style={{ backgroundColor: cat?.color ?? "#64748b" }}
-                              />
-                              <div className="min-w-0">
-                                <div className="truncate text-sm font-medium">
-                                  {t.description || cat?.name || "Sem descrição"}
+                              <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-6 py-2 text-sm hover:bg-muted/40">
+                                <div className="flex items-center gap-2">
+                                  <ChevronDown
+                                    className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${
+                                      subOpen ? "" : "-rotate-90"
+                                    }`}
+                                  />
+                                  <span
+                                    className="h-2 w-2 shrink-0 rounded-full"
+                                    style={{ backgroundColor: sg.color }}
+                                  />
+                                  <span className="font-medium">{sg.name}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    ({sg.items.length})
+                                  </span>
                                 </div>
-                                <div className="text-xs text-muted-foreground">
-                                  {catFullName(cat, cats)} •{" "}
-                                  {new Date(t.date + "T00:00:00").toLocaleDateString("pt-BR")}
+                                <div
+                                  className={`tabular-nums text-xs font-semibold ${
+                                    subBalance >= 0 ? "text-success" : "text-destructive"
+                                  }`}
+                                >
+                                  {subBalance >= 0 ? "+" : "−"}
+                                  {formatCurrency(Math.abs(subBalance))}
                                 </div>
-                              </div>
-                            </button>
-                            <div className="flex items-center gap-3">
-                              <div
-                                className={`tabular-nums font-semibold ${
-                                  t.type === "income" ? "text-success" : "text-destructive"
-                                }`}
-                              >
-                                {t.type === "income" ? "+" : "−"}
-                                {formatCurrency(Number(t.amount))}
-                              </div>
-                              <Button size="icon" variant="ghost" onClick={() => remove(t.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </li>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <ul className="divide-y divide-border/50 border-t bg-background">
+                                  {sg.items.map((t: Tx) => {
+                                    const cat = cats.find((c) => c.id === t.category_id);
+                                    return (
+                                      <li
+                                        key={t.id}
+                                        className="flex items-center justify-between gap-3 px-8 py-3"
+                                      >
+                                        <Checkbox
+                                          checked={selected.has(t.id)}
+                                          onCheckedChange={() => toggleOne(t.id)}
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => setEditing(t)}
+                                          className="flex min-w-0 flex-1 items-center gap-3 text-left hover:opacity-80"
+                                        >
+                                          <span
+                                            className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                            style={{ backgroundColor: cat?.color ?? "#64748b" }}
+                                          />
+                                          <div className="min-w-0">
+                                            <div className="truncate text-sm font-medium">
+                                              {t.description || cat?.name || "Sem descrição"}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                              {catFullName(cat, cats)} •{" "}
+                                              {new Date(t.date + "T00:00:00").toLocaleDateString("pt-BR")}
+                                            </div>
+                                          </div>
+                                        </button>
+                                        <div className="flex items-center gap-3">
+                                          <div
+                                            className={`tabular-nums font-semibold ${
+                                              t.type === "income" ? "text-success" : "text-destructive"
+                                            }`}
+                                          >
+                                            {t.type === "income" ? "+" : "−"}
+                                            {formatCurrency(Number(t.amount))}
+                                          </div>
+                                          <Button size="icon" variant="ghost" onClick={() => remove(t.id)}>
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </CollapsibleContent>
+                            </Collapsible>
+                          </div>
                         );
                       })}
-                    </ul>
+                    </div>
                   </CollapsibleContent>
                 </Collapsible>
               </Card>
             );
           })}
+
         </div>
       )}
 
