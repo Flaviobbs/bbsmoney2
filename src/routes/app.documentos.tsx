@@ -363,7 +363,7 @@ function DocumentosPage() {
           merchant: s.comerciante ?? null,
         };
       });
-      const { error } = await supabase.from("transactions").insert(rows);
+      const { error } = await supabase.from("transactions").upsert(rows, { onConflict: "user_id,date,amount,description", ignoreDuplicates: true });
       if (error) throw error;
       for (const { s } of sugs) {
         try { if (s.categoria) learnCategory(s.descricao, Number(s.valor), s.categoria); } catch (_) {}
