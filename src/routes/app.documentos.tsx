@@ -272,7 +272,7 @@ function DocumentosPage() {
       .eq("type", sug.tipo);
     const cat = cats?.find((c) => c.name.toLowerCase() === sug.categoria.toLowerCase());
     const { data: accounts } = await supabase.from("accounts").select("id").limit(1);
-    const { error } = await supabase.from("transactions").insert({
+    const { error } = await supabase.from("transactions").upsert({
       user_id: user.id,
       description: sug.descricao,
       amount: sug.valor,
@@ -283,7 +283,7 @@ function DocumentosPage() {
       source: "pdf",
       document_id: docId,
       merchant: sug.comerciante ?? null,
-    });
+    }, { onConflict: "user_id,date,amount,description", ignoreDuplicates: true });
     if (error) return toast.error(error.message);
     try { if (sug.categoria) learnCategory(sug.descricao, Number(sug.valor), sug.categoria); } catch (_) {}
     toast.success("Transação criada");
@@ -363,7 +363,7 @@ function DocumentosPage() {
           merchant: s.comerciante ?? null,
         };
       });
-      const { error } = await supabase.from("transactions").insert(rows);
+      const { error } = await supabase.from("transactions").upsert(rows, { onConflict: "user_id,date,amount,description", ignoreDuplicates: true });
       if (error) throw error;
       for (const { s } of sugs) {
         try { if (s.categoria) learnCategory(s.descricao, Number(s.valor), s.categoria); } catch (_) {}
