@@ -641,6 +641,35 @@ function DocumentosPage() {
                 : "Já existe uma transação idêntica (mesma data, valor e descrição). Deseja cadastrar mesmo assim?"}
             </DialogDescription>
           </DialogHeader>
+          {!confirmDup?.bulk && confirmDup && (() => {
+            const i = confirmDup.indices[0];
+            const s = extractions[confirmDup.docId]?.suggestions[i];
+            const match = s
+              ? (dupMatches[confirmDup.docId] ?? {})[dupKey(s.data, Number(s.valor), s.descricao)]
+              : undefined;
+            if (!s || !match) return null;
+            return (
+              <div className="space-y-2 rounded-md border p-3 text-sm">
+                <div>
+                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Nova sugestão</div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate">{s.data} · {s.descricao}</span>
+                    <span className="tabular-nums font-medium">{formatCurrency(Number(s.valor))}</span>
+                  </div>
+                </div>
+                <div className="border-t pt-2">
+                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Transação existente</div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate">{match.date} · {match.description}</span>
+                    <span className="tabular-nums font-medium">{formatCurrency(Number(match.amount))}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Cadastrada em {new Date(match.created_at).toLocaleString("pt-BR")}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
           {confirmDup?.bulk && (
             <div className="max-h-56 space-y-2 overflow-auto rounded-md border p-2 text-sm">
               {confirmDup.duplicates.map((i) => {
