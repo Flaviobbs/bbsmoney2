@@ -557,9 +557,9 @@ function DocumentosPage() {
                       </div>
                     )}
                     {ex.suggestions.map((s, i) => {
-                      const isDup = (dupKeys[d.id] ?? new Set()).has(
-                        dupKey(s.data, Number(s.valor), s.descricao),
-                      );
+                      const k = dupKey(s.data, Number(s.valor), s.descricao);
+                      const match = (dupMatches[d.id] ?? {})[k];
+                      const isDup = !!match;
                       return (
                       <div
                         key={i}
@@ -577,7 +577,9 @@ function DocumentosPage() {
                             {isDup && (
                               <Badge
                                 variant="outline"
-                                className="border-amber-500/60 text-amber-700 dark:text-amber-400"
+                                className="cursor-pointer border-amber-500/60 text-amber-700 dark:text-amber-400"
+                                onClick={() => setDupDetails({ suggestion: s, existing: match })}
+                                title="Ver transação existente"
                               >
                                 Já cadastrada
                               </Badge>
@@ -586,6 +588,15 @@ function DocumentosPage() {
                           <div className="text-xs text-muted-foreground">
                             {s.data} · {s.categoria} · {s.tipo === "income" ? "Receita" : "Despesa"}
                           </div>
+                          {isDup && (
+                            <button
+                              type="button"
+                              onClick={() => setDupDetails({ suggestion: s, existing: match })}
+                              className="mt-1 text-left text-xs text-amber-700 underline-offset-2 hover:underline dark:text-amber-400"
+                            >
+                              Mesclada com transação de {new Date(match.created_at).toLocaleDateString("pt-BR")} · ver detalhes
+                            </button>
+                          )}
                         </div>
                         <div
                           className={`text-sm font-semibold ${
