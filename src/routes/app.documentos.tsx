@@ -63,13 +63,15 @@ function DocumentosPage() {
   const [openDocId, setOpenDocId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Record<string, Set<number>>>({});
   const [bulkBusy, setBulkBusy] = useState(false);
-  const [dupKeys, setDupKeys] = useState<Record<string, Set<string>>>({});
+  type ExistingTx = { id: string; date: string; amount: number; description: string; created_at: string };
+  const [dupMatches, setDupMatches] = useState<Record<string, Record<string, ExistingTx>>>({});
   const [confirmDup, setConfirmDup] = useState<{
     docId: string;
     indices: number[];
     duplicates: number[];
     bulk: boolean;
   } | null>(null);
+  const [dupDetails, setDupDetails] = useState<{ suggestion: Suggestion; existing: ExistingTx } | null>(null);
   const [pwdPrompt, setPwdPrompt] = useState<{
     docId: string;
     incorrect: boolean;
@@ -99,29 +101,38 @@ function DocumentosPage() {
 
   const loadDuplicates = async (docId: string, sugs: Suggestion[]) => {
     if (!user || sugs.length === 0) {
-      setDupKeys((prev) => ({ ...prev, [docId]: new Set() }));
-      return new Set<string>();
+      setDupMatches((prev) => ({ ...prev, [docId]: {} }));
+      return {} as Record<string, ExistingTx>;
     }
     const dates = Array.from(new Set(sugs.map((s) => s.data)));
     const amounts = Array.from(new Set(sugs.map((s) => Number(s.valor))));
     const { data } = await supabase
       .from("transactions")
-      .select("date,amount,description")
+      .select("id,date,amount,description,created_at")
       .eq("user_id", user.id)
       .in("date", dates)
       .in("amount", amounts);
-    const existing = new Set<string>(
-      (data ?? []).map((t) =>
-        dupKey(t.date as string, Number(t.amount), (t.description as string) ?? ""),
-      ),
-    );
-    const dups = new Set<string>();
+    const existing = new Map<string, ExistingTx>();
+    (data ?? []).forEach((t) => {
+      const k = dupKey(t.date as string, Number(t.amount), (t.description as string) ?? "");
+      if (!existing.has(k)) {
+        existing.set(k, {
+          id: t.id as string,
+          date: t.date as string,
+          amount: Number(t.amount),
+          description: (t.description as string) ?? "",
+          created_at: t.created_at as string,
+        });
+      }
+    });
+    const matches: Record<string, ExistingTx> = {};
     sugs.forEach((s) => {
       const k = dupKey(s.data, Number(s.valor), s.descricao);
-      if (existing.has(k)) dups.add(k);
+      const m = existing.get(k);
+      if (m) matches[k] = m;
     });
-    setDupKeys((prev) => ({ ...prev, [docId]: dups }));
-    return dups;
+    setDupMatches((prev) => ({ ...prev, [docId]: matches }));
+    return matches;
   };
 
   useEffect(() => {
@@ -292,9 +303,9 @@ function DocumentosPage() {
   };
 
   const approve = async (docId: string, sug: Suggestion, idx: number) => {
-    const dups = dupKeys[docId] ?? (await loadDuplicates(docId, extractions[docId]?.suggestions ?? []));
+    const dups = dupMatches[docId] ?? (await loadDuplicates(docId, extractions[docId]?.suggestions ?? []));
     const k = dupKey(sug.data, Number(sug.valor), sug.descricao);
-    if (dups.has(k)) {
+    if (dups[k]) {
       setConfirmDup({ docId, indices: [idx], duplicates: [idx], bulk: false });
       return;
     }
@@ -327,7 +338,7 @@ function DocumentosPage() {
     const indices = Array.from(set);
     const duplicates = indices.filter((i) => {
       const s = ex.suggestions[i];
-      return s && dups.has(dupKey(s.data, Number(s.valor), s.descricao));
+      return !!s && !!dups[dupKey(s.data, Number(s.valor), s.descricao)];
     });
     if (duplicates.length > 0) {
       setConfirmDup({ docId, indices, duplicates, bulk: true });
@@ -547,9 +558,9 @@ function DocumentosPage() {
                       </div>
                     )}
                     {ex.suggestions.map((s, i) => {
-                      const isDup = (dupKeys[d.id] ?? new Set()).has(
-                        dupKey(s.data, Number(s.valor), s.descricao),
-                      );
+                      const k = dupKey(s.data, Number(s.valor), s.descricao);
+                      const match = (dupMatches[d.id] ?? {})[k];
+                      const isDup = !!match;
                       return (
                       <div
                         key={i}
@@ -567,7 +578,9 @@ function DocumentosPage() {
                             {isDup && (
                               <Badge
                                 variant="outline"
-                                className="border-amber-500/60 text-amber-700 dark:text-amber-400"
+                                className="cursor-pointer border-amber-500/60 text-amber-700 dark:text-amber-400"
+                                onClick={() => setDupDetails({ suggestion: s, existing: match })}
+                                title="Ver transação existente"
                               >
                                 Já cadastrada
                               </Badge>
@@ -576,6 +589,15 @@ function DocumentosPage() {
                           <div className="text-xs text-muted-foreground">
                             {s.data} · {s.categoria} · {s.tipo === "income" ? "Receita" : "Despesa"}
                           </div>
+                          {isDup && (
+                            <button
+                              type="button"
+                              onClick={() => setDupDetails({ suggestion: s, existing: match })}
+                              className="mt-1 text-left text-xs text-amber-700 underline-offset-2 hover:underline dark:text-amber-400"
+                            >
+                              Mesclada com transação de {new Date(match.created_at).toLocaleDateString("pt-BR")} · ver detalhes
+                            </button>
+                          )}
                         </div>
                         <div
                           className={`text-sm font-semibold ${
@@ -619,19 +641,54 @@ function DocumentosPage() {
                 : "Já existe uma transação idêntica (mesma data, valor e descrição). Deseja cadastrar mesmo assim?"}
             </DialogDescription>
           </DialogHeader>
+          {!confirmDup?.bulk && confirmDup && (() => {
+            const i = confirmDup.indices[0];
+            const s = extractions[confirmDup.docId]?.suggestions[i];
+            const match = s
+              ? (dupMatches[confirmDup.docId] ?? {})[dupKey(s.data, Number(s.valor), s.descricao)]
+              : undefined;
+            if (!s || !match) return null;
+            return (
+              <div className="space-y-2 rounded-md border p-3 text-sm">
+                <div>
+                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Nova sugestão</div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate">{s.data} · {s.descricao}</span>
+                    <span className="tabular-nums font-medium">{formatCurrency(Number(s.valor))}</span>
+                  </div>
+                </div>
+                <div className="border-t pt-2">
+                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Transação existente</div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate">{match.date} · {match.description}</span>
+                    <span className="tabular-nums font-medium">{formatCurrency(Number(match.amount))}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Cadastrada em {new Date(match.created_at).toLocaleString("pt-BR")}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
           {confirmDup?.bulk && (
-            <div className="max-h-56 space-y-1 overflow-auto rounded-md border p-2 text-sm">
+            <div className="max-h-56 space-y-2 overflow-auto rounded-md border p-2 text-sm">
               {confirmDup.duplicates.map((i) => {
                 const s = extractions[confirmDup.docId]?.suggestions[i];
                 if (!s) return null;
+                const match = (dupMatches[confirmDup.docId] ?? {})[
+                  dupKey(s.data, Number(s.valor), s.descricao)
+                ];
                 return (
-                  <div key={i} className="flex items-center justify-between gap-2">
-                    <span className="truncate">
-                      {s.data} · {s.descricao}
-                    </span>
-                    <span className="tabular-nums font-medium">
-                      {formatCurrency(Number(s.valor))}
-                    </span>
+                  <div key={i} className="rounded border-l-2 border-amber-500/60 bg-muted/30 px-2 py-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate">{s.data} · {s.descricao}</span>
+                      <span className="tabular-nums font-medium">{formatCurrency(Number(s.valor))}</span>
+                    </div>
+                    {match && (
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        ↳ mescla com: {match.date} · {match.description} · cadastrada em {new Date(match.created_at).toLocaleString("pt-BR")}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -730,6 +787,50 @@ function DocumentosPage() {
               Cancelar
             </Button>
             <Button onClick={submitPassword}>Processar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!dupDetails} onOpenChange={(o) => !o && setDupDetails(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Transação mesclada como duplicata</DialogTitle>
+            <DialogDescription>
+              Esta sugestão foi identificada como duplicata por coincidir em data, valor e descrição com uma transação existente.
+            </DialogDescription>
+          </DialogHeader>
+          {dupDetails && (
+            <div className="space-y-3 text-sm">
+              <div className="rounded-md border p-3">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sugestão do PDF</div>
+                <div className="mt-1 font-medium">{dupDetails.suggestion.descricao}</div>
+                <div className="mt-0.5 flex items-center justify-between gap-2 text-muted-foreground">
+                  <span>{dupDetails.suggestion.data} · {dupDetails.suggestion.categoria}</span>
+                  <span className="tabular-nums font-semibold text-foreground">
+                    {formatCurrency(Number(dupDetails.suggestion.valor))}
+                  </span>
+                </div>
+              </div>
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
+                <div className="text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                  Transação existente (mesclada)
+                </div>
+                <div className="mt-1 font-medium">{dupDetails.existing.description}</div>
+                <div className="mt-0.5 flex items-center justify-between gap-2 text-muted-foreground">
+                  <span>
+                    {dupDetails.existing.date} · cadastrada em{" "}
+                    {new Date(dupDetails.existing.created_at).toLocaleString("pt-BR")}
+                  </span>
+                  <span className="tabular-nums font-semibold text-foreground">
+                    {formatCurrency(Number(dupDetails.existing.amount))}
+                  </span>
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground break-all">ID: {dupDetails.existing.id}</div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDupDetails(null)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
