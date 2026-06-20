@@ -302,9 +302,9 @@ function DocumentosPage() {
   };
 
   const approve = async (docId: string, sug: Suggestion, idx: number) => {
-    const dups = dupKeys[docId] ?? (await loadDuplicates(docId, extractions[docId]?.suggestions ?? []));
+    const dups = dupMatches[docId] ?? (await loadDuplicates(docId, extractions[docId]?.suggestions ?? []));
     const k = dupKey(sug.data, Number(sug.valor), sug.descricao);
-    if (dups.has(k)) {
+    if (dups[k]) {
       setConfirmDup({ docId, indices: [idx], duplicates: [idx], bulk: false });
       return;
     }
