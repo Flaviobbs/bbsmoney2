@@ -790,6 +790,50 @@ function DocumentosPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!dupDetails} onOpenChange={(o) => !o && setDupDetails(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Transação mesclada como duplicata</DialogTitle>
+            <DialogDescription>
+              Esta sugestão foi identificada como duplicata por coincidir em data, valor e descrição com uma transação existente.
+            </DialogDescription>
+          </DialogHeader>
+          {dupDetails && (
+            <div className="space-y-3 text-sm">
+              <div className="rounded-md border p-3">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sugestão do PDF</div>
+                <div className="mt-1 font-medium">{dupDetails.suggestion.descricao}</div>
+                <div className="mt-0.5 flex items-center justify-between gap-2 text-muted-foreground">
+                  <span>{dupDetails.suggestion.data} · {dupDetails.suggestion.categoria}</span>
+                  <span className="tabular-nums font-semibold text-foreground">
+                    {formatCurrency(Number(dupDetails.suggestion.valor))}
+                  </span>
+                </div>
+              </div>
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
+                <div className="text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                  Transação existente (mesclada)
+                </div>
+                <div className="mt-1 font-medium">{dupDetails.existing.description}</div>
+                <div className="mt-0.5 flex items-center justify-between gap-2 text-muted-foreground">
+                  <span>
+                    {dupDetails.existing.date} · cadastrada em{" "}
+                    {new Date(dupDetails.existing.created_at).toLocaleString("pt-BR")}
+                  </span>
+                  <span className="tabular-nums font-semibold text-foreground">
+                    {formatCurrency(Number(dupDetails.existing.amount))}
+                  </span>
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground break-all">ID: {dupDetails.existing.id}</div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDupDetails(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
