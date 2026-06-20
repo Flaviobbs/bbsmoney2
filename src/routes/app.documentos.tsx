@@ -642,18 +642,24 @@ function DocumentosPage() {
             </DialogDescription>
           </DialogHeader>
           {confirmDup?.bulk && (
-            <div className="max-h-56 space-y-1 overflow-auto rounded-md border p-2 text-sm">
+            <div className="max-h-56 space-y-2 overflow-auto rounded-md border p-2 text-sm">
               {confirmDup.duplicates.map((i) => {
                 const s = extractions[confirmDup.docId]?.suggestions[i];
                 if (!s) return null;
+                const match = (dupMatches[confirmDup.docId] ?? {})[
+                  dupKey(s.data, Number(s.valor), s.descricao)
+                ];
                 return (
-                  <div key={i} className="flex items-center justify-between gap-2">
-                    <span className="truncate">
-                      {s.data} · {s.descricao}
-                    </span>
-                    <span className="tabular-nums font-medium">
-                      {formatCurrency(Number(s.valor))}
-                    </span>
+                  <div key={i} className="rounded border-l-2 border-amber-500/60 bg-muted/30 px-2 py-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate">{s.data} · {s.descricao}</span>
+                      <span className="tabular-nums font-medium">{formatCurrency(Number(s.valor))}</span>
+                    </div>
+                    {match && (
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        ↳ mescla com: {match.date} · {match.description} · cadastrada em {new Date(match.created_at).toLocaleString("pt-BR")}
+                      </div>
+                    )}
                   </div>
                 );
               })}
