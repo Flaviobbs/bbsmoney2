@@ -71,6 +71,7 @@ function DocumentosPage() {
     duplicates: number[];
     bulk: boolean;
   } | null>(null);
+  const [dupDetails, setDupDetails] = useState<{ suggestion: Suggestion; existing: ExistingTx } | null>(null);
   const [pwdPrompt, setPwdPrompt] = useState<{
     docId: string;
     incorrect: boolean;
