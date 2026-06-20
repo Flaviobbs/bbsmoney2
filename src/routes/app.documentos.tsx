@@ -337,7 +337,7 @@ function DocumentosPage() {
     const indices = Array.from(set);
     const duplicates = indices.filter((i) => {
       const s = ex.suggestions[i];
-      return s && dups.has(dupKey(s.data, Number(s.valor), s.descricao));
+      return !!s && !!dups[dupKey(s.data, Number(s.valor), s.descricao)];
     });
     if (duplicates.length > 0) {
       setConfirmDup({ docId, indices, duplicates, bulk: true });
