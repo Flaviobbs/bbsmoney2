@@ -100,29 +100,38 @@ function DocumentosPage() {
 
   const loadDuplicates = async (docId: string, sugs: Suggestion[]) => {
     if (!user || sugs.length === 0) {
-      setDupKeys((prev) => ({ ...prev, [docId]: new Set() }));
-      return new Set<string>();
+      setDupMatches((prev) => ({ ...prev, [docId]: {} }));
+      return {} as Record<string, ExistingTx>;
     }
     const dates = Array.from(new Set(sugs.map((s) => s.data)));
     const amounts = Array.from(new Set(sugs.map((s) => Number(s.valor))));
     const { data } = await supabase
       .from("transactions")
-      .select("date,amount,description")
+      .select("id,date,amount,description,created_at")
       .eq("user_id", user.id)
       .in("date", dates)
       .in("amount", amounts);
-    const existing = new Set<string>(
-      (data ?? []).map((t) =>
-        dupKey(t.date as string, Number(t.amount), (t.description as string) ?? ""),
-      ),
-    );
-    const dups = new Set<string>();
+    const existing = new Map<string, ExistingTx>();
+    (data ?? []).forEach((t) => {
+      const k = dupKey(t.date as string, Number(t.amount), (t.description as string) ?? "");
+      if (!existing.has(k)) {
+        existing.set(k, {
+          id: t.id as string,
+          date: t.date as string,
+          amount: Number(t.amount),
+          description: (t.description as string) ?? "",
+          created_at: t.created_at as string,
+        });
+      }
+    });
+    const matches: Record<string, ExistingTx> = {};
     sugs.forEach((s) => {
       const k = dupKey(s.data, Number(s.valor), s.descricao);
-      if (existing.has(k)) dups.add(k);
+      const m = existing.get(k);
+      if (m) matches[k] = m;
     });
-    setDupKeys((prev) => ({ ...prev, [docId]: dups }));
-    return dups;
+    setDupMatches((prev) => ({ ...prev, [docId]: matches }));
+    return matches;
   };
 
   useEffect(() => {
