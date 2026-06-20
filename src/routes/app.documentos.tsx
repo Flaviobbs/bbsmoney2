@@ -63,7 +63,8 @@ function DocumentosPage() {
   const [openDocId, setOpenDocId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Record<string, Set<number>>>({});
   const [bulkBusy, setBulkBusy] = useState(false);
-  const [dupKeys, setDupKeys] = useState<Record<string, Set<string>>>({});
+  type ExistingTx = { id: string; date: string; amount: number; description: string; created_at: string };
+  const [dupMatches, setDupMatches] = useState<Record<string, Record<string, ExistingTx>>>({});
   const [confirmDup, setConfirmDup] = useState<{
     docId: string;
     indices: number[];
