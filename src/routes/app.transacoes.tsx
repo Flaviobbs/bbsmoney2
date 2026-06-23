@@ -123,12 +123,26 @@ function TransactionsPage() {
   const [bulkSaving, setBulkSaving] = useState(false);
 
   const load = async () => {
-    const [{ data: t }, { data: c }, { data: a }] = await Promise.all([
-      supabase.from("transactions").select("*").order("date", { ascending: false }).limit(500),
+    const pageSize = 1000;
+    let from = 0;
+    const all: Tx[] = [];
+    // Paginação para evitar truncamento (limite padrão do PostgREST é 1000).
+    while (true) {
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*")
+        .order("date", { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (error || !data) break;
+      all.push(...(data as Tx[]));
+      if (data.length < pageSize) break;
+      from += pageSize;
+    }
+    const [{ data: c }, { data: a }] = await Promise.all([
       supabase.from("categories").select("id,name,type,color,parent_id").order("name"),
       supabase.from("accounts").select("id,name"),
     ]);
-    setTx((t ?? []) as Tx[]);
+    setTx(all);
     setCats((c ?? []) as Cat[]);
     setAccs((a ?? []) as Acc[]);
     setSelected(new Set());
