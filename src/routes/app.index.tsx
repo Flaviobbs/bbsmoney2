@@ -51,6 +51,7 @@ interface CatRow {
   name: string;
   color: string;
   type: "income" | "expense";
+  parent_id: string | null;
 }
 interface UpcomingBill {
   id: string;
