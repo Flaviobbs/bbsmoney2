@@ -349,7 +349,7 @@ function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.30 0.03 285 / 50%)" />
                 <XAxis dataKey="month" stroke="oklch(0.70 0.03 280)" fontSize={12} />
                 <YAxis stroke="oklch(0.70 0.03 280)" fontSize={12} tickFormatter={(v) => `R$${v}`} />
-                <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={chartTooltip} />
+                <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={chartTooltip} itemStyle={chartTooltipItem} labelStyle={chartTooltipLabel} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Bar dataKey="income" name="Receitas" fill="oklch(0.70 0.18 155)" radius={[6, 6, 0, 0]} />
                 <Bar dataKey="expense" name="Despesas" fill="oklch(0.62 0.24 25)" radius={[6, 6, 0, 0]} />
