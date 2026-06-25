@@ -475,6 +475,15 @@ const chartTooltip = {
   color: "oklch(0.97 0.01 280)",
 };
 
+const chartTooltipItem = {
+  color: "oklch(0.97 0.01 280)",
+};
+
+const chartTooltipLabel = {
+  color: "oklch(0.97 0.01 280)",
+  fontWeight: 600,
+};
+
 function EmptyChart({ label }: { label: string }) {
   return (
     <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
