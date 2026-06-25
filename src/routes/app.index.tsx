@@ -51,6 +51,7 @@ interface CatRow {
   name: string;
   color: string;
   type: "income" | "expense";
+  parent_id: string | null;
 }
 interface UpcomingBill {
   id: string;
@@ -71,6 +72,8 @@ function Dashboard() {
   const [period, setPeriod] = useState<PeriodOption>("6m");
   const [customStart, setCustomStart] = useState(todayISO());
   const [customEnd, setCustomEnd] = useState(todayISO());
+  const [catChartType, setCatChartType] = useState<"expense" | "income">("expense");
+  const [catChartId, setCatChartId] = useState<string>("");
 
   const periodStart = useMemo(() => {
     const d = new Date();
@@ -129,7 +132,7 @@ function Dashboard() {
           .gte("date", periodStart)
           .lte("date", periodEnd)
           .order("date", { ascending: false }),
-        supabase.from("categories").select("id,name,color,type"),
+        supabase.from("categories").select("id,name,color,type,parent_id"),
         supabase
           .from("bills")
           .select("id,description,amount,due_date,type")
@@ -197,7 +200,61 @@ function Dashboard() {
     return Array.from(buckets.values());
   }, [tx, period, periodEnd, periodMonths, now]);
 
-  const recent = tx.slice(0, 6);
+  const childrenMap = useMemo(() => {
+    const m = new Map<string, string[]>();
+    cats.forEach((c) => {
+      if (c.parent_id) {
+        const arr = m.get(c.parent_id) ?? [];
+        arr.push(c.id);
+        m.set(c.parent_id, arr);
+      }
+    });
+    return m;
+  }, [cats]);
+
+  const descendantIds = useMemo(() => {
+    if (!catChartId) return new Set<string>();
+    const out = new Set<string>([catChartId]);
+    const stack = [catChartId];
+    while (stack.length) {
+      const id = stack.pop()!;
+      (childrenMap.get(id) ?? []).forEach((cid) => {
+        if (!out.has(cid)) {
+          out.add(cid);
+          stack.push(cid);
+        }
+      });
+    }
+    return out;
+  }, [catChartId, childrenMap]);
+
+  const categoryMonthly = useMemo(() => {
+    const buckets = new Map<string, { month: string; total: number; key: string }>();
+    const totalMonths = periodMonths;
+    for (let i = totalMonths - 1; i >= 0; i--) {
+      const refDate = period === "custom"
+        ? new Date(new Date(periodEnd + "T00:00:00").getFullYear(), new Date(periodEnd + "T00:00:00").getMonth() - i, 1)
+        : new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = refDate.toISOString().slice(0, 7);
+      buckets.set(key, { month: monthLabel(refDate), total: 0, key });
+    }
+    if (catChartId) {
+      tx.forEach((t) => {
+        if (t.type !== catChartType) return;
+        if (!t.category_id || !descendantIds.has(t.category_id)) return;
+        const b = buckets.get(t.date.slice(0, 7));
+        if (b) b.total += Number(t.amount);
+      });
+    }
+    return Array.from(buckets.values());
+  }, [tx, catChartId, catChartType, descendantIds, period, periodEnd, periodMonths, now]);
+
+  const catOptions = useMemo(
+    () => cats.filter((c) => c.type === catChartType).sort((a, b) => a.name.localeCompare(b.name)),
+    [cats, catChartType],
+  );
+
+  const selectedCat = cats.find((c) => c.id === catChartId);
 
   const periodLabel = useMemo(() => {
     switch (period) {
@@ -273,7 +330,8 @@ function Dashboard() {
                       <Cell key={i} fill={e.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={chartTooltip} />
+                  <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={chartTooltip} itemStyle={chartTooltipItem} labelStyle={chartTooltipLabel} />
+
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                 </PieChart>
               </ResponsiveContainer>
@@ -291,7 +349,7 @@ function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.30 0.03 285 / 50%)" />
                 <XAxis dataKey="month" stroke="oklch(0.70 0.03 280)" fontSize={12} />
                 <YAxis stroke="oklch(0.70 0.03 280)" fontSize={12} tickFormatter={(v) => `R$${v}`} />
-                <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={chartTooltip} />
+                <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={chartTooltip} itemStyle={chartTooltipItem} labelStyle={chartTooltipLabel} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Bar dataKey="income" name="Receitas" fill="oklch(0.70 0.18 155)" radius={[6, 6, 0, 0]} />
                 <Bar dataKey="expense" name="Despesas" fill="oklch(0.62 0.24 25)" radius={[6, 6, 0, 0]} />
@@ -303,43 +361,65 @@ function Dashboard() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Últimas transações</CardTitle>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="text-base">
+              {catChartType === "expense" ? "Despesas" : "Receitas"} mensais por categoria
+              {selectedCat ? ` — ${selectedCat.name}` : ""}
+            </CardTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                value={catChartType}
+                onValueChange={(v) => {
+                  setCatChartType(v as "expense" | "income");
+                  setCatChartId("");
+                }}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="expense">Despesas</SelectItem>
+                  <SelectItem value="income">Receitas</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={catChartId} onValueChange={setCatChartId}>
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder="Selecione uma categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  {catOptions.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.parent_id ? "↳ " : ""}{c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
-          {recent.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              Nenhum lançamento ainda. Comece adicionando suas transações.
-            </p>
+        <CardContent className="h-[280px]">
+          {!catChartId ? (
+            <EmptyChart label="Selecione uma categoria para ver a evolução mensal" />
           ) : (
-            <ul className="divide-y divide-border/50">
-              {recent.map((t) => {
-                const cat = cats.find((c) => c.id === t.category_id);
-                return (
-                  <li key={t.id} className="flex items-center justify-between py-3">
-                    <div className="flex items-center gap-3">
-                      <span
-                        className="h-2.5 w-2.5 rounded-full"
-                        style={{ backgroundColor: cat?.color ?? "#64748b" }}
-                      />
-                      <div>
-                        <div className="text-sm font-medium">{t.description || cat?.name || "Sem descrição"}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {cat?.name ?? "—"} • {new Date(t.date + "T00:00:00").toLocaleDateString("pt-BR")}
-                        </div>
-                      </div>
-                    </div>
-                    <div
-                      className={`tabular-nums font-semibold ${
-                        t.type === "income" ? "text-success" : "text-destructive"
-                      }`}
-                    >
-                      {t.type === "income" ? "+" : "−"}
-                      {formatCurrency(Number(t.amount))}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={categoryMonthly}>
+                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.30 0.03 285 / 50%)" />
+                <XAxis dataKey="month" stroke="oklch(0.70 0.03 280)" fontSize={12} />
+                <YAxis stroke="oklch(0.70 0.03 280)" fontSize={12} tickFormatter={(v) => `R$${v}`} />
+                <Tooltip
+                  formatter={(v: number) => formatCurrency(v)}
+                  contentStyle={chartTooltip}
+                  itemStyle={chartTooltipItem}
+                  labelStyle={chartTooltipLabel}
+                />
+                <Bar
+                  dataKey="total"
+                  name={catChartType === "expense" ? "Despesa" : "Receita"}
+                  fill={selectedCat?.color ?? (catChartType === "expense" ? "oklch(0.62 0.24 25)" : "oklch(0.70 0.18 155)")}
+                  radius={[6, 6, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
           )}
         </CardContent>
       </Card>
@@ -394,6 +474,15 @@ const chartTooltip = {
   borderRadius: 8,
   fontSize: 12,
   color: "oklch(0.97 0.01 280)",
+};
+
+const chartTooltipItem = {
+  color: "oklch(0.97 0.01 280)",
+};
+
+const chartTooltipLabel = {
+  color: "oklch(0.97 0.01 280)",
+  fontWeight: 600,
 };
 
 function EmptyChart({ label }: { label: string }) {
