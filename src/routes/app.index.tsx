@@ -200,7 +200,61 @@ function Dashboard() {
     return Array.from(buckets.values());
   }, [tx, period, periodEnd, periodMonths, now]);
 
-  const recent = tx.slice(0, 6);
+  const childrenMap = useMemo(() => {
+    const m = new Map<string, string[]>();
+    cats.forEach((c) => {
+      if (c.parent_id) {
+        const arr = m.get(c.parent_id) ?? [];
+        arr.push(c.id);
+        m.set(c.parent_id, arr);
+      }
+    });
+    return m;
+  }, [cats]);
+
+  const descendantIds = useMemo(() => {
+    if (!catChartId) return new Set<string>();
+    const out = new Set<string>([catChartId]);
+    const stack = [catChartId];
+    while (stack.length) {
+      const id = stack.pop()!;
+      (childrenMap.get(id) ?? []).forEach((cid) => {
+        if (!out.has(cid)) {
+          out.add(cid);
+          stack.push(cid);
+        }
+      });
+    }
+    return out;
+  }, [catChartId, childrenMap]);
+
+  const categoryMonthly = useMemo(() => {
+    const buckets = new Map<string, { month: string; total: number; key: string }>();
+    const totalMonths = periodMonths;
+    for (let i = totalMonths - 1; i >= 0; i--) {
+      const refDate = period === "custom"
+        ? new Date(new Date(periodEnd + "T00:00:00").getFullYear(), new Date(periodEnd + "T00:00:00").getMonth() - i, 1)
+        : new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = refDate.toISOString().slice(0, 7);
+      buckets.set(key, { month: monthLabel(refDate), total: 0, key });
+    }
+    if (catChartId) {
+      tx.forEach((t) => {
+        if (t.type !== catChartType) return;
+        if (!t.category_id || !descendantIds.has(t.category_id)) return;
+        const b = buckets.get(t.date.slice(0, 7));
+        if (b) b.total += Number(t.amount);
+      });
+    }
+    return Array.from(buckets.values());
+  }, [tx, catChartId, catChartType, descendantIds, period, periodEnd, periodMonths, now]);
+
+  const catOptions = useMemo(
+    () => cats.filter((c) => c.type === catChartType).sort((a, b) => a.name.localeCompare(b.name)),
+    [cats, catChartType],
+  );
+
+  const selectedCat = cats.find((c) => c.id === catChartId);
 
   const periodLabel = useMemo(() => {
     switch (period) {
