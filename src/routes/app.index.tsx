@@ -330,7 +330,8 @@ function Dashboard() {
                       <Cell key={i} fill={e.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={chartTooltip} />
+                  <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={chartTooltip} itemStyle={chartTooltipItem} labelStyle={chartTooltipLabel} />
+
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                 </PieChart>
               </ResponsiveContainer>
