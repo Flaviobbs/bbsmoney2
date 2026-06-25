@@ -72,6 +72,8 @@ function Dashboard() {
   const [period, setPeriod] = useState<PeriodOption>("6m");
   const [customStart, setCustomStart] = useState(todayISO());
   const [customEnd, setCustomEnd] = useState(todayISO());
+  const [catChartType, setCatChartType] = useState<"expense" | "income">("expense");
+  const [catChartId, setCatChartId] = useState<string>("");
 
   const periodStart = useMemo(() => {
     const d = new Date();
