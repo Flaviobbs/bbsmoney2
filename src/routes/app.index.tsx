@@ -360,43 +360,65 @@ function Dashboard() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Últimas transações</CardTitle>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="text-base">
+              {catChartType === "expense" ? "Despesas" : "Receitas"} mensais por categoria
+              {selectedCat ? ` — ${selectedCat.name}` : ""}
+            </CardTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                value={catChartType}
+                onValueChange={(v) => {
+                  setCatChartType(v as "expense" | "income");
+                  setCatChartId("");
+                }}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="expense">Despesas</SelectItem>
+                  <SelectItem value="income">Receitas</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={catChartId} onValueChange={setCatChartId}>
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder="Selecione uma categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  {catOptions.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.parent_id ? "↳ " : ""}{c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
-          {recent.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              Nenhum lançamento ainda. Comece adicionando suas transações.
-            </p>
+        <CardContent className="h-[280px]">
+          {!catChartId ? (
+            <EmptyChart label="Selecione uma categoria para ver a evolução mensal" />
           ) : (
-            <ul className="divide-y divide-border/50">
-              {recent.map((t) => {
-                const cat = cats.find((c) => c.id === t.category_id);
-                return (
-                  <li key={t.id} className="flex items-center justify-between py-3">
-                    <div className="flex items-center gap-3">
-                      <span
-                        className="h-2.5 w-2.5 rounded-full"
-                        style={{ backgroundColor: cat?.color ?? "#64748b" }}
-                      />
-                      <div>
-                        <div className="text-sm font-medium">{t.description || cat?.name || "Sem descrição"}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {cat?.name ?? "—"} • {new Date(t.date + "T00:00:00").toLocaleDateString("pt-BR")}
-                        </div>
-                      </div>
-                    </div>
-                    <div
-                      className={`tabular-nums font-semibold ${
-                        t.type === "income" ? "text-success" : "text-destructive"
-                      }`}
-                    >
-                      {t.type === "income" ? "+" : "−"}
-                      {formatCurrency(Number(t.amount))}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={categoryMonthly}>
+                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.30 0.03 285 / 50%)" />
+                <XAxis dataKey="month" stroke="oklch(0.70 0.03 280)" fontSize={12} />
+                <YAxis stroke="oklch(0.70 0.03 280)" fontSize={12} tickFormatter={(v) => `R$${v}`} />
+                <Tooltip
+                  formatter={(v: number) => formatCurrency(v)}
+                  contentStyle={chartTooltip}
+                  itemStyle={chartTooltipItem}
+                  labelStyle={chartTooltipLabel}
+                />
+                <Bar
+                  dataKey="total"
+                  name={catChartType === "expense" ? "Despesa" : "Receita"}
+                  fill={selectedCat?.color ?? (catChartType === "expense" ? "oklch(0.62 0.24 25)" : "oklch(0.70 0.18 155)")}
+                  radius={[6, 6, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
           )}
         </CardContent>
       </Card>
