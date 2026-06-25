@@ -130,7 +130,7 @@ function Dashboard() {
           .gte("date", periodStart)
           .lte("date", periodEnd)
           .order("date", { ascending: false }),
-        supabase.from("categories").select("id,name,color,type"),
+        supabase.from("categories").select("id,name,color,type,parent_id"),
         supabase
           .from("bills")
           .select("id,description,amount,due_date,type")
