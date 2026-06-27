@@ -619,56 +619,68 @@ function DocumentosPage() {
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-2">
                             <Select
-                              value={s.tipo}
-                              onValueChange={(v) =>
-                                updateSuggestionField(d.id, i, {
-                                  tipo: v as "income" | "expense",
-                                  categoria: "",
-                                })
-                              }
-                            >
-                              <SelectTrigger className="h-7 w-[110px] text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="expense">Despesa</SelectItem>
-                                <SelectItem value="income">Receita</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <Select
                               value={
                                 categories.find(
                                   (c) =>
-                                    c.type === s.tipo &&
+                                    c.type === "expense" &&
                                     c.name.toLowerCase() === (s.categoria ?? "").toLowerCase(),
                                 )?.id ?? ""
                               }
                               onValueChange={(id) => {
                                 const c = categories.find((x) => x.id === id);
-                                if (c) void updateSuggestionField(d.id, i, { categoria: c.name });
+                                if (c)
+                                  void updateSuggestionField(d.id, i, {
+                                    tipo: "expense",
+                                    categoria: c.name,
+                                  });
                               }}
                             >
-                              <SelectTrigger className="h-7 w-[220px] text-xs">
+                              <SelectTrigger className="h-7 w-[240px] text-xs">
                                 <SelectValue placeholder="Selecionar categoria" />
                               </SelectTrigger>
                               <SelectContent>
-                                {categories
-                                  .filter((c) => c.type === s.tipo)
-                                  .sort((a, b) => {
-                                    const ap = a.parent_id ? 1 : 0;
-                                    const bp = b.parent_id ? 1 : 0;
-                                    if (ap !== bp) return ap - bp;
-                                    return a.name.localeCompare(b.name);
-                                  })
-                                  .map((c) => (
-                                    <SelectItem key={c.id} value={c.id}>
-                                      {c.parent_id ? "↳ " : ""}
-                                      {c.name}
-                                    </SelectItem>
-                                  ))}
+                                {(() => {
+                                  const exp = categories.filter((c) => c.type === "expense");
+                                  const parents = exp
+                                    .filter((c) => !c.parent_id)
+                                    .sort((a, b) => a.name.localeCompare(b.name));
+                                  const childrenOf = (pid: string) =>
+                                    exp
+                                      .filter((c) => c.parent_id === pid)
+                                      .sort((a, b) => a.name.localeCompare(b.name));
+                                  const orphans = exp
+                                    .filter(
+                                      (c) => c.parent_id && !parents.some((p) => p.id === c.parent_id),
+                                    )
+                                    .sort((a, b) => a.name.localeCompare(b.name));
+                                  const items: JSX.Element[] = [];
+                                  parents.forEach((p) => {
+                                    items.push(
+                                      <SelectItem key={p.id} value={p.id}>
+                                        {p.name}
+                                      </SelectItem>,
+                                    );
+                                    childrenOf(p.id).forEach((c) => {
+                                      items.push(
+                                        <SelectItem key={c.id} value={c.id}>
+                                          <span className="pl-4 text-muted-foreground">↳ {c.name}</span>
+                                        </SelectItem>,
+                                      );
+                                    });
+                                  });
+                                  orphans.forEach((c) => {
+                                    items.push(
+                                      <SelectItem key={c.id} value={c.id}>
+                                        {c.name}
+                                      </SelectItem>,
+                                    );
+                                  });
+                                  return items;
+                                })()}
                               </SelectContent>
                             </Select>
                           </div>
+
                           {isDup && (
                             <button
                               type="button"
