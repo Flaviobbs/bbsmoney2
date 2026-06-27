@@ -511,13 +511,17 @@ function DocumentosPage() {
                     variant={
                       d.status === "failed"
                         ? "destructive"
-                        : d.status === "processed"
-                          ? "outline"
-                          : d.status === "uploaded"
-                            ? "warning"
-                            : "secondary"
+                        : d.status === "processing"
+                          ? "secondary"
+                          : "outline"
                     }
-                    className={d.status === "processed" ? "text-muted-foreground border-muted-foreground/40" : ""}
+                    className={
+                      d.status === "uploaded"
+                        ? "text-muted-foreground/60 border-muted-foreground/25"
+                        : d.status === "processed"
+                          ? "text-muted-foreground border-muted-foreground/40"
+                          : ""
+                    }
                   >
                     {statusLabel[d.status]}
                   </Badge>
