@@ -653,7 +653,7 @@ function DocumentosPage() {
                                       (c) => c.parent_id && !parents.some((p) => p.id === c.parent_id),
                                     )
                                     .sort((a, b) => a.name.localeCompare(b.name));
-                                  const items: JSX.Element[] = [];
+                                  const items: React.ReactNode[] = [];
                                   parents.forEach((p) => {
                                     items.push(
                                       <SelectItem key={p.id} value={p.id}>
