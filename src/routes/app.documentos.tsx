@@ -21,6 +21,13 @@ import { Loader2, Upload, FileText, Trash2, Check, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { formatCurrency } from "@/lib/format";
 import { suggestCategoryDetailed, learnCategory } from "@/services/invoiceProcessor";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 
 export const Route = createFileRoute("/app/documentos")({
