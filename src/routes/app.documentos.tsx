@@ -512,11 +512,12 @@ function DocumentosPage() {
                       d.status === "failed"
                         ? "destructive"
                         : d.status === "processed"
-                          ? "success"
+                          ? "outline"
                           : d.status === "uploaded"
                             ? "warning"
                             : "secondary"
                     }
+                    className={d.status === "processed" ? "text-muted-foreground border-muted-foreground/40" : ""}
                   >
                     {statusLabel[d.status]}
                   </Badge>
