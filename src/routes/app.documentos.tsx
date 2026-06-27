@@ -507,12 +507,23 @@ function DocumentosPage() {
                       {new Date(d.created_at).toLocaleString("pt-BR")}
                     </div>
                   </div>
-                  <Badge variant={d.status === "failed" ? "destructive" : "secondary"}>
+                  <Badge
+                    variant={
+                      d.status === "failed"
+                        ? "destructive"
+                        : d.status === "processed"
+                          ? "success"
+                          : d.status === "uploaded"
+                            ? "warning"
+                            : "secondary"
+                    }
+                  >
                     {statusLabel[d.status]}
                   </Badge>
                   {d.status !== "processing" && (
                     <Button
                       size="sm"
+                      variant={d.status === "processed" ? "outline" : "default"}
                       onClick={() => processDoc(d.id)}
                       disabled={processingId === d.id}
                     >
