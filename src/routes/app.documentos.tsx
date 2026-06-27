@@ -21,6 +21,13 @@ import { Loader2, Upload, FileText, Trash2, Check, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { formatCurrency } from "@/lib/format";
 import { suggestCategoryDetailed, learnCategory } from "@/services/invoiceProcessor";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 
 export const Route = createFileRoute("/app/documentos")({
@@ -63,6 +70,8 @@ function DocumentosPage() {
   const [openDocId, setOpenDocId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Record<string, Set<number>>>({});
   const [bulkBusy, setBulkBusy] = useState(false);
+  type Cat = { id: string; name: string; type: "income" | "expense"; parent_id: string | null };
+  const [categories, setCategories] = useState<Cat[]>([]);
   type ExistingTx = { id: string; date: string; amount: number; description: string; created_at: string };
   const [dupMatches, setDupMatches] = useState<Record<string, Record<string, ExistingTx>>>({});
   const [confirmDup, setConfirmDup] = useState<{
@@ -94,6 +103,25 @@ function DocumentosPage() {
       map[e.document_id] = e as unknown as Extraction;
     });
     setExtractions(map);
+    const { data: cats } = await supabase
+      .from("categories")
+      .select("id,name,type,parent_id");
+    setCategories((cats as Cat[]) ?? []);
+  };
+
+  const updateSuggestionField = async (
+    docId: string,
+    idx: number,
+    patch: Partial<Suggestion>,
+  ) => {
+    const ex = extractions[docId];
+    if (!ex) return;
+    const next = ex.suggestions.map((s, i) => (i === idx ? { ...s, ...patch } : s));
+    setExtractions((prev) => ({ ...prev, [docId]: { ...ex, suggestions: next } }));
+    await supabase
+      .from("document_extractions")
+      .update({ suggestions: next })
+      .eq("id", ex.id);
   };
 
   const dupKey = (date: string, amount: number, description: string) =>
@@ -587,7 +615,59 @@ function DocumentosPage() {
                             )}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {s.data} · {s.categoria} · {s.tipo === "income" ? "Receita" : "Despesa"}
+                            {s.data} · {s.tipo === "income" ? "Receita" : "Despesa"}
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            <Select
+                              value={s.tipo}
+                              onValueChange={(v) =>
+                                updateSuggestionField(d.id, i, {
+                                  tipo: v as "income" | "expense",
+                                  categoria: "",
+                                })
+                              }
+                            >
+                              <SelectTrigger className="h-7 w-[110px] text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="expense">Despesa</SelectItem>
+                                <SelectItem value="income">Receita</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Select
+                              value={
+                                categories.find(
+                                  (c) =>
+                                    c.type === s.tipo &&
+                                    c.name.toLowerCase() === (s.categoria ?? "").toLowerCase(),
+                                )?.id ?? ""
+                              }
+                              onValueChange={(id) => {
+                                const c = categories.find((x) => x.id === id);
+                                if (c) void updateSuggestionField(d.id, i, { categoria: c.name });
+                              }}
+                            >
+                              <SelectTrigger className="h-7 w-[220px] text-xs">
+                                <SelectValue placeholder="Selecionar categoria" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {categories
+                                  .filter((c) => c.type === s.tipo)
+                                  .sort((a, b) => {
+                                    const ap = a.parent_id ? 1 : 0;
+                                    const bp = b.parent_id ? 1 : 0;
+                                    if (ap !== bp) return ap - bp;
+                                    return a.name.localeCompare(b.name);
+                                  })
+                                  .map((c) => (
+                                    <SelectItem key={c.id} value={c.id}>
+                                      {c.parent_id ? "↳ " : ""}
+                                      {c.name}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                           {isDup && (
                             <button
