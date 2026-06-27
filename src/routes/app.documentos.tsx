@@ -523,9 +523,14 @@ function DocumentosPage() {
                   {d.status !== "processing" && (
                     <Button
                       size="sm"
-                      variant={d.status === "processed" ? "outline" : "default"}
+                      variant={d.status === "processed" ? "destructive" : "default"}
                       onClick={() => processDoc(d.id)}
                       disabled={processingId === d.id}
+                      className={
+                        d.status === "processed"
+                          ? ""
+                          : "bg-success text-success-foreground hover:bg-success/90"
+                      }
                     >
                       {processingId === d.id ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
