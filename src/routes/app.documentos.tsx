@@ -103,6 +103,25 @@ function DocumentosPage() {
       map[e.document_id] = e as unknown as Extraction;
     });
     setExtractions(map);
+    const { data: cats } = await supabase
+      .from("categories")
+      .select("id,name,type,parent_id");
+    setCategories((cats as Cat[]) ?? []);
+  };
+
+  const updateSuggestionField = async (
+    docId: string,
+    idx: number,
+    patch: Partial<Suggestion>,
+  ) => {
+    const ex = extractions[docId];
+    if (!ex) return;
+    const next = ex.suggestions.map((s, i) => (i === idx ? { ...s, ...patch } : s));
+    setExtractions((prev) => ({ ...prev, [docId]: { ...ex, suggestions: next } }));
+    await supabase
+      .from("document_extractions")
+      .update({ suggestions: next })
+      .eq("id", ex.id);
   };
 
   const dupKey = (date: string, amount: number, description: string) =>
