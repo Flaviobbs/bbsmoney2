@@ -268,14 +268,25 @@ function DocumentosPage() {
         }
         throw new Error(json.error ?? "Erro");
       }
-      // Aplica aprendizado local sobre as sugestões da IA (alta confiança vence)
+      // Aplica aprendizado local sobre as sugestões da IA. Aprendizado do
+      // histórico do usuário vence a IA sempre que houver match (alta ou média
+      // confiança via aprendizado), porque reflete decisões reais já tomadas.
       const aiSuggestions = (json.suggestions ?? []) as Suggestion[];
       const overridden = aiSuggestions.map((s) => {
         try {
           const res = suggestCategoryDetailed(s.descricao, Number(s.valor));
-          if (res.category && res.confidence === "alta" && res.source === "aprendizado") {
+          if (
+            res.category &&
+            res.source === "aprendizado" &&
+            (res.confidence === "alta" || res.confidence === "media")
+          ) {
             return { ...s, categoria: res.category };
           }
+        } catch (_) {
+          /* ignora */
+        }
+        return s;
+      });
         } catch (_) {
           /* ignora */
         }
