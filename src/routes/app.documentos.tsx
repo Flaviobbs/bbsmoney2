@@ -287,11 +287,6 @@ function DocumentosPage() {
         }
         return s;
       });
-        } catch (_) {
-          /* ignora */
-        }
-        return s;
-      });
       if (overridden.some((s, i) => s.categoria !== aiSuggestions[i].categoria)) {
         // Persiste no extraction para que a próxima carga já reflita
         const { data: ex } = await supabase
