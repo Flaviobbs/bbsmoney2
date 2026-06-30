@@ -130,6 +130,9 @@ function DocumentosPage() {
     } catch (err) {
       console.error("[documentos] seedLearningFromHistory error", err);
     }
+  };
+
+
 
   const updateSuggestionField = async (
     docId: string,
