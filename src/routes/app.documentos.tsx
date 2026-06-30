@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import { Loader2, Upload, FileText, Trash2, Check, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { formatCurrency } from "@/lib/format";
-import { suggestCategoryDetailed, learnCategory } from "@/services/invoiceProcessor";
+import { suggestCategoryDetailed, learnCategory, seedLearningFromHistory } from "@/services/invoiceProcessor";
 import {
   Select,
   SelectContent,
@@ -106,8 +106,30 @@ function DocumentosPage() {
     const { data: cats } = await supabase
       .from("categories")
       .select("id,name,type,parent_id");
-    setCategories((cats as Cat[]) ?? []);
-  };
+    const catList = (cats as Cat[]) ?? [];
+    setCategories(catList);
+
+    // Aprendizado retroativo: alimenta o motor com TODAS as transações
+    // categorizadas do usuário. Assim, a IA do PDF passa a respeitar
+    // categorias previamente definidas para o mesmo comerciante/descrição.
+    try {
+      const { data: txs } = await supabase
+        .from("transactions")
+        .select("description,amount,category_id")
+        .not("category_id", "is", null)
+        .limit(5000);
+      const catById = new Map(catList.map((c) => [c.id, c.name] as const));
+      const seedRows = (txs ?? [])
+        .map((t) => ({
+          description: (t.description as string) ?? "",
+          amount: Number(t.amount),
+          category: catById.get(t.category_id as string) ?? "",
+        }))
+        .filter((r) => r.description && r.category);
+      if (seedRows.length > 0) seedLearningFromHistory(seedRows);
+    } catch (err) {
+      console.error("[documentos] seedLearningFromHistory error", err);
+    }
 
   const updateSuggestionField = async (
     docId: string,
