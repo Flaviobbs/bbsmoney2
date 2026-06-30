@@ -434,6 +434,66 @@ export function learnCategory(
   return store;
 }
 
+/**
+ * Popula o aprendizado local com base no histórico real do usuário (transações
+ * já cadastradas com categoria). Permite que o motor reconheça categorias
+ * previamente definidas mesmo que o usuário nunca tenha aprovado sugestões via
+ * fluxo de PDF. Idempotente: re-executar apenas reforça as frequências.
+ */
+export function seedLearningFromHistory(
+  txs: Array<{ description: string; amount: number; category: string }>,
+): CategoryLearningStore {
+  if (typeof window === "undefined") return readLearningStore();
+  const store = readLearningStore();
+  // Conta votos por (assinatura + categoria) e por (chave exata + categoria)
+  // para que a categoria vencedora seja a mais usada, não a última vista.
+  const sigVotes = new Map<string, Map<string, number>>(); // signature -> cat -> votes
+  const keyVotes = new Map<string, Map<string, number>>(); // exactKey -> cat -> votes
+  const meta = new Map<string, { tokens: string[]; signature: string }>();
+  for (const t of txs) {
+    if (!t.category || !t.description) continue;
+    const key = buildLearningKey(t.description, Number(t.amount));
+    const tokens = tokenize(t.description);
+    const signature = merchantSignature(t.description);
+    meta.set(key, { tokens, signature });
+    const kv = keyVotes.get(key) ?? new Map();
+    kv.set(t.category, (kv.get(t.category) ?? 0) + 1);
+    keyVotes.set(key, kv);
+    if (signature) {
+      const sv = sigVotes.get(signature) ?? new Map();
+      sv.set(t.category, (sv.get(t.category) ?? 0) + 1);
+      sigVotes.set(signature, sv);
+    }
+  }
+  for (const [key, votes] of keyVotes) {
+    const [bestCat, freq] = [...votes.entries()].sort((a, b) => b[1] - a[1])[0];
+    const m = meta.get(key)!;
+    const existing = store[key];
+    // histórico real tem prioridade sobre aprendizado antigo divergente
+    if (!existing || existing.category !== bestCat || (existing.frequency ?? 0) < freq) {
+      store[key] = {
+        category: bestCat,
+        frequency: freq,
+        lastUpdated: new Date().toISOString(),
+        tokens: m.tokens,
+        signature: m.signature || undefined,
+      };
+    }
+  }
+  // Reforça assinaturas: para qualquer entrada cuja signature tenha vencedor claro
+  // no histórico, alinha a categoria ao vencedor.
+  for (const [sig, votes] of sigVotes) {
+    const [bestCat] = [...votes.entries()].sort((a, b) => b[1] - a[1])[0];
+    for (const [k, entry] of Object.entries(store)) {
+      if (entry.signature === sig && entry.category !== bestCat) {
+        store[k] = { ...entry, category: bestCat, lastUpdated: new Date().toISOString() };
+      }
+    }
+  }
+  writeLearningStore(store);
+  return store;
+}
+
 // ---------- Pipeline ----------
 
 function newProcessedLine(
