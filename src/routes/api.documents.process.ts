@@ -140,9 +140,10 @@ export const Route = createFileRoute("/api/documents/process")({
                     `Categorize com base na lista fornecida; se nenhuma encaixar, use 'Outros'. Datas no formato AAAA-MM-DD. ` +
                     `Hoje é ${todayBR} (America/Sao_Paulo). NUNCA retorne datas no futuro — se a data extraída for posterior a ${todayBR}, recue para o ano anterior. ` +
                     `Para faturas de cartão de crédito: tente identificar a data de vencimento/mês de referência da fatura. ` +
-                    `COMPRAS PARCELADAS (ex: "PARC 03/12", "1/10", "PARCELA 2 DE 6"): inclua APENAS a parcela do mês atual da fatura (não gere parcelas futuras). ` +
+                    `COMPRAS PARCELADAS: identifique QUALQUER indicativo de parcelamento no texto — "PARC 03/12", "1/10", "PARCELA 2 DE 6", "em 10x", "10x sem juros", "3 vezes", "parcelado em 6x", "(2/12)". Para essas compras preencha SEMPRE "parcela_atual" e "parcela_total" (se só souber o total, use parcela_atual=1). ` +
+                    `Inclua APENAS a parcela do mês atual da fatura (não gere parcelas futuras). ` +
                     `Para parcelas, o campo "data" deve ser a data de vencimento/pagamento daquela parcela (mês da fatura), NÃO a data da compra original. ` +
-                    `Preencha "parcela_atual" e "parcela_total" sempre que detectar parcelamento. ` +
+                    `Compras à vista (sem nenhum marcador de parcela) NÃO devem receber parcela_atual/parcela_total. ` +
                     `IDENTIFICAÇÃO DE CARTÃO: quando a fatura listar transações por titular/cartão (ex: "PORTADOR: FULANO", "CARTÃO FINAL 4437", "**** 4437", "4258 XXXX XXXX 4437"), preencha "card_last4" com APENAS os 4 últimos dígitos do cartão daquela transação. Para compras marcadas como online/internet/e-commerce sem cartão físico identificável, use "@online".`,
                 },
                 {

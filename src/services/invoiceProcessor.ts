@@ -602,7 +602,7 @@ export function derivePurchaseType(input: {
   if ((pt && pt > 1) || (pa && pa >= 1 && pt && pt >= 1 && pa <= pt)) {
     return "installment";
   }
-  if (input.description && detectParcel(input.description)) {
+  if (input.description && hasInstallmentHint(input.description)) {
     return "installment";
   }
   return "cash";
