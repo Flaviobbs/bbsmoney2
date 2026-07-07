@@ -190,6 +190,19 @@ function TransactionsPage() {
     return c.parent_id ?? c.id;
   };
 
+  const cardOptions = useMemo(() => {
+    const s = new Set<string>();
+    tx.forEach((t) => {
+      if (t.card_last4) s.add(t.card_last4);
+    });
+    return Array.from(s).sort((a, b) => {
+      // "@" primeiro, depois numérico
+      if (a.startsWith("@") && !b.startsWith("@")) return -1;
+      if (!a.startsWith("@") && b.startsWith("@")) return 1;
+      return a.localeCompare(b);
+    });
+  }, [tx]);
+
   const filtered = tx.filter((t) => {
     if (filterType !== "all" && t.type !== filterType) return false;
     if (filterCategory !== "all") {
@@ -204,9 +217,19 @@ function TransactionsPage() {
         if (!matches) return false;
       }
     }
+    if (filterCard !== "all") {
+      if (filterCard === "__none__") {
+        if (t.card_last4) return false;
+      } else if (t.card_last4 !== filterCard) return false;
+    }
+    if (filterPurchaseType !== "all") {
+      const pt = t.purchase_type ?? "cash";
+      if (pt !== filterPurchaseType) return false;
+    }
     if (search && !t.description.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
+
 
   const toggleOne = (id: string) =>
     setSelected((prev) => {
