@@ -169,6 +169,18 @@ function Dashboard() {
   const balance = income - expense;
   const savingsPct = income > 0 ? Math.round((balance / income) * 100) : 0;
 
+  const { installmentTotal, cashTotal } = useMemo(() => {
+    let inst = 0;
+    let cash = 0;
+    periodTx
+      .filter((t) => t.type === "expense")
+      .forEach((t) => {
+        if (t.purchase_type === "installment") inst += Number(t.amount);
+        else cash += Number(t.amount);
+      });
+    return { installmentTotal: inst, cashTotal: cash };
+  }, [periodTx]);
+
   const expenseByCat = useMemo(() => {
     const map = new Map<string, number>();
     periodTx
