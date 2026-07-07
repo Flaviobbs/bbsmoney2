@@ -75,10 +75,20 @@ const PARCEL_REGEXES: RegExp[] = [
   /[\(\[\{]\s*(\d{1,3})\s*\/\s*(\d{1,3})\s*[\)\]\}]/,
   /\b(\d{1,3})\s*[ºoa°ª]?\s*(?:de|of)\s*(\d{1,3})\b/i,
   /\b(\d{1,3})\s*-\s*(\d{1,3})\b/,
-  
+
   /(?:^|\s)(\d{1,3})\s*\/\s*(\d{1,3})(?!\d)/,
 ];
 
+// Padrões que indicam parcelamento mesmo sem "parcela atual/total" completos.
+// Ex.: "em 10x", "10 vezes", "3x sem juros", "parcelado", "PARC.".
+const INSTALLMENT_HINT_REGEXES: RegExp[] = [
+  /\bem\s*(\d{1,3})\s*x\b/i,
+  /\b(\d{1,3})\s*x\s*(?:sem\s*juros|s\.?\s*juros|de\s*r?\$)/i,
+  /\b(\d{1,3})\s*vezes\b/i,
+  /\bparcelad[oa]s?\b/i,
+  /\bparc\.?\b(?!\s*\d)/i,
+  /\bpcl\.?\b(?!\s*\d)/i,
+];
 
 export function detectParcel(description: string): ParcelInfo | null {
   if (!description) return null;
@@ -94,6 +104,16 @@ export function detectParcel(description: string): ParcelInfo | null {
     return { current, total };
   }
   return null;
+}
+
+/**
+ * Retorna true se a descrição contém indicativo de parcelamento, mesmo sem
+ * parcela atual/total explícita (ex.: "em 10x", "3 vezes", "parcelado").
+ */
+export function hasInstallmentHint(description: string): boolean {
+  if (!description) return false;
+  if (detectParcel(description)) return true;
+  return INSTALLMENT_HINT_REGEXES.some((re) => re.test(description));
 }
 
 // ---------- Datas ----------
