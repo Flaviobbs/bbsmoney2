@@ -815,9 +815,11 @@ function DocumentosPage() {
                               onClick={() => rejectSuggestion(d.id, i)}
                             >
                               <X className="h-4 w-4" />
-
-                        </Button>
+                            </Button>
+                          </>
+                        )}
                       </div>
+
                       );
                     })}
                   </div>
