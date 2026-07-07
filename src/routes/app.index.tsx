@@ -391,6 +391,45 @@ function Dashboard() {
         </Card>
       </div>
 
+      {expenseByCard.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Despesas por cartão</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y divide-border/50">
+              {expenseByCard.map((c) => (
+                <li
+                  key={c.key}
+                  className="flex items-center justify-between gap-3 py-2 text-sm"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {c.label}
+                    </span>
+                    {c.installment > 0 && (
+                      <span className="rounded border border-indigo-500/40 px-1.5 py-0 text-[10px] text-indigo-600 dark:text-indigo-400">
+                        Parcelado: {formatCurrency(c.installment)}
+                      </span>
+                    )}
+                    {c.cash > 0 && (
+                      <span className="rounded border border-muted-foreground/25 px-1.5 py-0 text-[10px] text-muted-foreground">
+                        À vista: {formatCurrency(c.cash)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="tabular-nums font-semibold text-destructive">
+                    {formatCurrency(c.total)}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+
+
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
