@@ -505,6 +505,36 @@ function TransactionsPage() {
               ))}
           </SelectContent>
         </Select>
+        <Select value={filterCard} onValueChange={setFilterCard}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Cartão" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os cartões</SelectItem>
+            <SelectItem value="__none__">Sem cartão</SelectItem>
+            {cardOptions.map((c) => (
+              <SelectItem key={c} value={c}>
+                <span className="font-mono text-xs">
+                  {c.startsWith("@") ? c : `•••• ${c}`}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={filterPurchaseType}
+          onValueChange={(v) => setFilterPurchaseType(v as "all" | "cash" | "installment")}
+        >
+          <SelectTrigger className="w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">À vista + Parcelado</SelectItem>
+            <SelectItem value="cash">Somente à vista</SelectItem>
+            <SelectItem value="installment">Somente parcelado</SelectItem>
+          </SelectContent>
+        </Select>
+
         <Select value={groupBy} onValueChange={(v) => setGroupBy(v as "category" | "month")}>
           <SelectTrigger className="w-44">
             <SelectValue placeholder="Agrupar por" />
