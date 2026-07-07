@@ -729,14 +729,29 @@ function TransactionsPage() {
                                             style={{ backgroundColor: cat?.color ?? "#64748b" }}
                                           />
                                           <div className="min-w-0">
-                                            <div className="truncate text-sm font-medium">
-                                              {t.description || cat?.name || "Sem descrição"}
+                                            <div className="flex flex-wrap items-center gap-2">
+                                              <span className="truncate text-sm font-medium">
+                                                {t.description || cat?.name || "Sem descrição"}
+                                              </span>
+                                              {t.card_last4 && (
+                                                <span className="rounded border border-muted-foreground/25 px-1.5 py-0 font-mono text-[10px] text-muted-foreground">
+                                                  {t.card_last4.startsWith("@")
+                                                    ? t.card_last4
+                                                    : `•••• ${t.card_last4}`}
+                                                </span>
+                                              )}
+                                              {t.purchase_type === "installment" && (
+                                                <span className="rounded border border-indigo-500/40 px-1.5 py-0 text-[10px] text-indigo-600 dark:text-indigo-400">
+                                                  Parcelado
+                                                </span>
+                                              )}
                                             </div>
                                             <div className="text-xs text-muted-foreground">
                                               {catFullName(cat, cats)} •{" "}
                                               {new Date(t.date + "T00:00:00").toLocaleDateString("pt-BR")}
                                             </div>
                                           </div>
+
                                         </button>
                                         <div className="flex items-center gap-3">
                                           <div
