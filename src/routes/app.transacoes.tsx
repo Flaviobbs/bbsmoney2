@@ -116,8 +116,11 @@ function TransactionsPage() {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"all" | "income" | "expense">("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [filterCard, setFilterCard] = useState<string>("all");
+  const [filterPurchaseType, setFilterPurchaseType] = useState<"all" | "cash" | "installment">("all");
   const [groupBy, setGroupBy] = useState<"category" | "month">("category");
   const [open, setOpen] = useState(false);
+
   const [editing, setEditing] = useState<Tx | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [selected, setSelected] = useState<Set<string>>(new Set());
