@@ -391,6 +391,7 @@ export type Database = {
         Row: {
           account_id: string | null
           amount: number
+          card_last4: string | null
           category_id: string | null
           created_at: string
           date: string
@@ -399,6 +400,7 @@ export type Database = {
           id: string
           merchant: string | null
           notes: string | null
+          purchase_type: string | null
           source: Database["public"]["Enums"]["transaction_source"]
           type: Database["public"]["Enums"]["transaction_type"]
           user_id: string
@@ -406,6 +408,7 @@ export type Database = {
         Insert: {
           account_id?: string | null
           amount: number
+          card_last4?: string | null
           category_id?: string | null
           created_at?: string
           date?: string
@@ -414,6 +417,7 @@ export type Database = {
           id?: string
           merchant?: string | null
           notes?: string | null
+          purchase_type?: string | null
           source?: Database["public"]["Enums"]["transaction_source"]
           type: Database["public"]["Enums"]["transaction_type"]
           user_id: string
@@ -421,6 +425,7 @@ export type Database = {
         Update: {
           account_id?: string | null
           amount?: number
+          card_last4?: string | null
           category_id?: string | null
           created_at?: string
           date?: string
@@ -429,6 +434,7 @@ export type Database = {
           id?: string
           merchant?: string | null
           notes?: string | null
+          purchase_type?: string | null
           source?: Database["public"]["Enums"]["transaction_source"]
           type?: Database["public"]["Enums"]["transaction_type"]
           user_id?: string
