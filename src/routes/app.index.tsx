@@ -184,6 +184,34 @@ function Dashboard() {
       .sort((a, b) => b.value - a.value);
   }, [periodTx, cats]);
 
+  const expenseByCard = useMemo(() => {
+    const map = new Map<string, { installment: number; cash: number }>();
+    periodTx
+      .filter((t) => t.type === "expense")
+      .forEach((t) => {
+        const key = t.card_last4 ?? "__none__";
+        const cur = map.get(key) ?? { installment: 0, cash: 0 };
+        if (t.purchase_type === "installment") cur.installment += Number(t.amount);
+        else cur.cash += Number(t.amount);
+        map.set(key, cur);
+      });
+    return Array.from(map.entries())
+      .map(([key, v]) => ({
+        key,
+        label:
+          key === "__none__"
+            ? "Sem cartão"
+            : key.startsWith("@")
+              ? key
+              : `•••• ${key}`,
+        total: v.installment + v.cash,
+        cash: v.cash,
+        installment: v.installment,
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [periodTx]);
+
+
   const monthly = useMemo(() => {
     const buckets = new Map<string, { month: string; income: number; expense: number; key: string }>();
     const totalMonths = periodMonths;
