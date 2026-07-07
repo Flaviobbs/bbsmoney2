@@ -49,8 +49,13 @@ type Suggestion = {
   data: string;
   categoria: string;
   comerciante?: string;
+  card_last4?: string | null;
+  purchase_type?: "cash" | "installment" | null;
+  already_imported?: boolean;
+  existing_tx_id?: string;
 };
 type Extraction = { id: string; document_id: string; suggestions: Suggestion[]; status: string };
+
 
 const statusLabel: Record<Doc["status"], string> = {
   uploaded: "Enviado",
