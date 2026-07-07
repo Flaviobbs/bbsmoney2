@@ -131,10 +131,11 @@ function Dashboard() {
       const [{ data: t }, { data: c }, { data: ub }] = await Promise.all([
         supabase
           .from("transactions")
-          .select("id,type,amount,date,description,category_id")
+          .select("id,type,amount,date,description,category_id,card_last4,purchase_type")
           .gte("date", periodStart)
           .lte("date", periodEnd)
           .order("date", { ascending: false }),
+
         supabase.from("categories").select("id,name,color,type,parent_id"),
         supabase
           .from("bills")
