@@ -390,11 +390,19 @@ function DocumentosPage() {
 
   const toggleSelectAll = (docId: string, total: number) => {
     setSelected((prev) => {
+      const ex = extractions[docId];
+      const selectable = ex
+        ? ex.suggestions
+            .map((s, i) => (s.already_imported ? -1 : i))
+            .filter((i) => i >= 0)
+        : Array.from({ length: total }, (_, i) => i);
       const set = prev[docId] ?? new Set<number>();
-      if (set.size === total) return { ...prev, [docId]: new Set() };
-      return { ...prev, [docId]: new Set(Array.from({ length: total }, (_, i) => i)) };
+      if (set.size >= selectable.length && selectable.every((i) => set.has(i)))
+        return { ...prev, [docId]: new Set() };
+      return { ...prev, [docId]: new Set(selectable) };
     });
   };
+
 
   const bulkApprove = async (docId: string) => {
     if (!user) return;
