@@ -169,6 +169,18 @@ function Dashboard() {
   const balance = income - expense;
   const savingsPct = income > 0 ? Math.round((balance / income) * 100) : 0;
 
+  const { installmentTotal, cashTotal } = useMemo(() => {
+    let inst = 0;
+    let cash = 0;
+    periodTx
+      .filter((t) => t.type === "expense")
+      .forEach((t) => {
+        if (t.purchase_type === "installment") inst += Number(t.amount);
+        else cash += Number(t.amount);
+      });
+    return { installmentTotal: inst, cashTotal: cash };
+  }, [periodTx]);
+
   const expenseByCat = useMemo(() => {
     const map = new Map<string, number>();
     periodTx
@@ -390,6 +402,32 @@ function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {(installmentTotal > 0 || cashTotal > 0) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Despesas à vista vs Parcelamentos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-border/60 p-3">
+                <div className="text-xs text-muted-foreground">À vista</div>
+                <div className="mt-1 text-lg font-semibold tabular-nums">{formatCurrency(cashTotal)}</div>
+                <div className="mt-0.5 text-[11px] text-muted-foreground">
+                  {expense > 0 ? `${Math.round((cashTotal / expense) * 100)}% das despesas` : "—"}
+                </div>
+              </div>
+              <div className="rounded-lg border border-indigo-500/30 p-3">
+                <div className="text-xs text-indigo-600 dark:text-indigo-400">Parcelamentos</div>
+                <div className="mt-1 text-lg font-semibold tabular-nums">{formatCurrency(installmentTotal)}</div>
+                <div className="mt-0.5 text-[11px] text-muted-foreground">
+                  {expense > 0 ? `${Math.round((installmentTotal / expense) * 100)}% das despesas` : "—"}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {expenseByCard.length > 0 && (
         <Card>
