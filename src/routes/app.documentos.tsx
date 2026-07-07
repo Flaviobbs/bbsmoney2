@@ -358,6 +358,8 @@ function DocumentosPage() {
       source: "pdf",
       document_id: docId,
       merchant: sug.comerciante ?? null,
+      card_last4: sug.card_last4 ?? null,
+      purchase_type: sug.purchase_type ?? "cash",
     }, { onConflict: "user_id,date,amount,description", ignoreDuplicates: true });
     if (error) return toast.error(error.message);
     try { if (sug.categoria) learnCategory(sug.descricao, Number(sug.valor), sug.categoria); } catch (_) {}
@@ -365,6 +367,7 @@ function DocumentosPage() {
     rejectSuggestion(docId, idx);
 
   };
+
 
   const approve = async (docId: string, sug: Suggestion, idx: number) => {
     const dups = dupMatches[docId] ?? (await loadDuplicates(docId, extractions[docId]?.suggestions ?? []));
