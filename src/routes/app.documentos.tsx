@@ -49,8 +49,13 @@ type Suggestion = {
   data: string;
   categoria: string;
   comerciante?: string;
+  card_last4?: string | null;
+  purchase_type?: "cash" | "installment" | null;
+  already_imported?: boolean;
+  existing_tx_id?: string;
 };
 type Extraction = { id: string; document_id: string; suggestions: Suggestion[]; status: string };
+
 
 const statusLabel: Record<Doc["status"], string> = {
   uploaded: "Enviado",
@@ -353,6 +358,8 @@ function DocumentosPage() {
       source: "pdf",
       document_id: docId,
       merchant: sug.comerciante ?? null,
+      card_last4: sug.card_last4 ?? null,
+      purchase_type: sug.purchase_type ?? "cash",
     }, { onConflict: "user_id,date,amount,description", ignoreDuplicates: true });
     if (error) return toast.error(error.message);
     try { if (sug.categoria) learnCategory(sug.descricao, Number(sug.valor), sug.categoria); } catch (_) {}
@@ -360,6 +367,7 @@ function DocumentosPage() {
     rejectSuggestion(docId, idx);
 
   };
+
 
   const approve = async (docId: string, sug: Suggestion, idx: number) => {
     const dups = dupMatches[docId] ?? (await loadDuplicates(docId, extractions[docId]?.suggestions ?? []));
@@ -382,11 +390,19 @@ function DocumentosPage() {
 
   const toggleSelectAll = (docId: string, total: number) => {
     setSelected((prev) => {
+      const ex = extractions[docId];
+      const selectable = ex
+        ? ex.suggestions
+            .map((s, i) => (s.already_imported ? -1 : i))
+            .filter((i) => i >= 0)
+        : Array.from({ length: total }, (_, i) => i);
       const set = prev[docId] ?? new Set<number>();
-      if (set.size === total) return { ...prev, [docId]: new Set() };
-      return { ...prev, [docId]: new Set(Array.from({ length: total }, (_, i) => i)) };
+      if (set.size >= selectable.length && selectable.every((i) => set.has(i)))
+        return { ...prev, [docId]: new Set() };
+      return { ...prev, [docId]: new Set(selectable) };
     });
   };
+
 
   const bulkApprove = async (docId: string) => {
     if (!user) return;
@@ -431,7 +447,10 @@ function DocumentosPage() {
           source: "pdf" as const,
           document_id: docId,
           merchant: s.comerciante ?? null,
+          card_last4: s.card_last4 ?? null,
+          purchase_type: s.purchase_type ?? "cash",
         };
+
       });
       const { error } = await supabase.from("transactions").upsert(rows, { onConflict: "user_id,date,amount,description", ignoreDuplicates: true });
       if (error) throw error;
@@ -640,22 +659,38 @@ function DocumentosPage() {
                     {ex.suggestions.map((s, i) => {
                       const k = dupKey(s.data, Number(s.valor), s.descricao);
                       const match = (dupMatches[d.id] ?? {})[k];
-                      const isDup = !!match;
+                      const alreadyImported = !!s.already_imported;
+                      const isDup = !alreadyImported && !!match;
+                      const isInstallment = s.purchase_type === "installment";
                       return (
                       <div
                         key={i}
                         className={`flex flex-wrap items-center gap-3 rounded-md border p-2 ${
-                          isDup ? "border-amber-500/40 bg-amber-500/5" : ""
+                          alreadyImported
+                            ? "border-muted-foreground/20 bg-muted/20 opacity-70"
+                            : isDup
+                              ? "border-amber-500/40 bg-amber-500/5"
+                              : ""
                         }`}
                       >
                         <Checkbox
                           checked={selected[d.id]?.has(i) ?? false}
+                          disabled={alreadyImported}
                           onCheckedChange={() => toggleSelect(d.id, i)}
                         />
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span className="truncate text-sm font-medium">{s.descricao}</span>
-                            {isDup && (
+                            {alreadyImported && (
+                              <Badge
+                                variant="outline"
+                                className="border-muted-foreground/30 text-muted-foreground"
+                                title="Já existe uma transação criada a partir desta sugestão"
+                              >
+                                Já lançada
+                              </Badge>
+                            )}
+                            {!alreadyImported && isDup && (
                               <Badge
                                 variant="outline"
                                 className="cursor-pointer border-amber-500/60 text-amber-700 dark:text-amber-400"
@@ -665,9 +700,27 @@ function DocumentosPage() {
                                 Já cadastrada
                               </Badge>
                             )}
+                            {s.card_last4 && (
+                              <Badge
+                                variant="outline"
+                                className="border-muted-foreground/25 text-muted-foreground text-[10px] font-mono"
+                                title="Cartão identificado"
+                              >
+                                {s.card_last4.startsWith("@") ? s.card_last4 : `•••• ${s.card_last4}`}
+                              </Badge>
+                            )}
+                            {isInstallment && (
+                              <Badge
+                                variant="outline"
+                                className="border-indigo-500/50 text-indigo-600 dark:text-indigo-400"
+                                title="Compra parcelada"
+                              >
+                                Parcelado
+                              </Badge>
+                            )}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {s.data} · {s.tipo === "income" ? "Receita" : "Despesa"}
+                            {s.data} · {isInstallment ? "Parcelamento" : "Despesa"}
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-2">
                             <Select
@@ -686,6 +739,7 @@ function DocumentosPage() {
                                     categoria: c.name,
                                   });
                               }}
+                              disabled={alreadyImported}
                             >
                               <SelectTrigger className="h-7 w-[240px] text-xs">
                                 <SelectValue placeholder="Selecionar categoria" />
@@ -733,7 +787,7 @@ function DocumentosPage() {
                             </Select>
                           </div>
 
-                          {isDup && (
+                          {!alreadyImported && isDup && (
                             <button
                               type="button"
                               onClick={() => setDupDetails({ suggestion: s, existing: match })}
@@ -750,17 +804,22 @@ function DocumentosPage() {
                         >
                           {formatCurrency(Number(s.valor))}
                         </div>
-                        <Button size="sm" onClick={() => approve(d.id, s, i)}>
-                          <Check className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => rejectSuggestion(d.id, i)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+                        {!alreadyImported && (
+                          <>
+                            <Button size="sm" onClick={() => approve(d.id, s, i)}>
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => rejectSuggestion(d.id, i)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
                       </div>
+
                       );
                     })}
                   </div>

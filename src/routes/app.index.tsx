@@ -45,7 +45,10 @@ interface TxRow {
   date: string;
   description: string;
   category_id: string | null;
+  card_last4: string | null;
+  purchase_type: "cash" | "installment" | null;
 }
+
 interface CatRow {
   id: string;
   name: string;
@@ -128,10 +131,11 @@ function Dashboard() {
       const [{ data: t }, { data: c }, { data: ub }] = await Promise.all([
         supabase
           .from("transactions")
-          .select("id,type,amount,date,description,category_id")
+          .select("id,type,amount,date,description,category_id,card_last4,purchase_type")
           .gte("date", periodStart)
           .lte("date", periodEnd)
           .order("date", { ascending: false }),
+
         supabase.from("categories").select("id,name,color,type,parent_id"),
         supabase
           .from("bills")
@@ -179,6 +183,34 @@ function Dashboard() {
       })
       .sort((a, b) => b.value - a.value);
   }, [periodTx, cats]);
+
+  const expenseByCard = useMemo(() => {
+    const map = new Map<string, { installment: number; cash: number }>();
+    periodTx
+      .filter((t) => t.type === "expense")
+      .forEach((t) => {
+        const key = t.card_last4 ?? "__none__";
+        const cur = map.get(key) ?? { installment: 0, cash: 0 };
+        if (t.purchase_type === "installment") cur.installment += Number(t.amount);
+        else cur.cash += Number(t.amount);
+        map.set(key, cur);
+      });
+    return Array.from(map.entries())
+      .map(([key, v]) => ({
+        key,
+        label:
+          key === "__none__"
+            ? "Sem cartão"
+            : key.startsWith("@")
+              ? key
+              : `•••• ${key}`,
+        total: v.installment + v.cash,
+        cash: v.cash,
+        installment: v.installment,
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [periodTx]);
+
 
   const monthly = useMemo(() => {
     const buckets = new Map<string, { month: string; income: number; expense: number; key: string }>();
@@ -358,6 +390,45 @@ function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {expenseByCard.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Despesas por cartão</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y divide-border/50">
+              {expenseByCard.map((c) => (
+                <li
+                  key={c.key}
+                  className="flex items-center justify-between gap-3 py-2 text-sm"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {c.label}
+                    </span>
+                    {c.installment > 0 && (
+                      <span className="rounded border border-indigo-500/40 px-1.5 py-0 text-[10px] text-indigo-600 dark:text-indigo-400">
+                        Parcelado: {formatCurrency(c.installment)}
+                      </span>
+                    )}
+                    {c.cash > 0 && (
+                      <span className="rounded border border-muted-foreground/25 px-1.5 py-0 text-[10px] text-muted-foreground">
+                        À vista: {formatCurrency(c.cash)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="tabular-nums font-semibold text-destructive">
+                    {formatCurrency(c.total)}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+
 
       <Card>
         <CardHeader>

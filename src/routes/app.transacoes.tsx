@@ -56,7 +56,10 @@ interface Tx {
   description: string;
   category_id: string | null;
   account_id: string | null;
+  card_last4: string | null;
+  purchase_type: "cash" | "installment" | null;
 }
+
 interface Cat {
   id: string;
   name: string;
@@ -113,8 +116,11 @@ function TransactionsPage() {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"all" | "income" | "expense">("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [filterCard, setFilterCard] = useState<string>("all");
+  const [filterPurchaseType, setFilterPurchaseType] = useState<"all" | "cash" | "installment">("all");
   const [groupBy, setGroupBy] = useState<"category" | "month">("category");
   const [open, setOpen] = useState(false);
+
   const [editing, setEditing] = useState<Tx | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -184,6 +190,19 @@ function TransactionsPage() {
     return c.parent_id ?? c.id;
   };
 
+  const cardOptions = useMemo(() => {
+    const s = new Set<string>();
+    tx.forEach((t) => {
+      if (t.card_last4) s.add(t.card_last4);
+    });
+    return Array.from(s).sort((a, b) => {
+      // "@" primeiro, depois numérico
+      if (a.startsWith("@") && !b.startsWith("@")) return -1;
+      if (!a.startsWith("@") && b.startsWith("@")) return 1;
+      return a.localeCompare(b);
+    });
+  }, [tx]);
+
   const filtered = tx.filter((t) => {
     if (filterType !== "all" && t.type !== filterType) return false;
     if (filterCategory !== "all") {
@@ -198,9 +217,19 @@ function TransactionsPage() {
         if (!matches) return false;
       }
     }
+    if (filterCard !== "all") {
+      if (filterCard === "__none__") {
+        if (t.card_last4) return false;
+      } else if (t.card_last4 !== filterCard) return false;
+    }
+    if (filterPurchaseType !== "all") {
+      const pt = t.purchase_type ?? "cash";
+      if (pt !== filterPurchaseType) return false;
+    }
     if (search && !t.description.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
+
 
   const toggleOne = (id: string) =>
     setSelected((prev) => {
@@ -476,6 +505,36 @@ function TransactionsPage() {
               ))}
           </SelectContent>
         </Select>
+        <Select value={filterCard} onValueChange={setFilterCard}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Cartão" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os cartões</SelectItem>
+            <SelectItem value="__none__">Sem cartão</SelectItem>
+            {cardOptions.map((c) => (
+              <SelectItem key={c} value={c}>
+                <span className="font-mono text-xs">
+                  {c.startsWith("@") ? c : `•••• ${c}`}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={filterPurchaseType}
+          onValueChange={(v) => setFilterPurchaseType(v as "all" | "cash" | "installment")}
+        >
+          <SelectTrigger className="w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">À vista + Parcelado</SelectItem>
+            <SelectItem value="cash">Somente à vista</SelectItem>
+            <SelectItem value="installment">Somente parcelado</SelectItem>
+          </SelectContent>
+        </Select>
+
         <Select value={groupBy} onValueChange={(v) => setGroupBy(v as "category" | "month")}>
           <SelectTrigger className="w-44">
             <SelectValue placeholder="Agrupar por" />
@@ -670,14 +729,29 @@ function TransactionsPage() {
                                             style={{ backgroundColor: cat?.color ?? "#64748b" }}
                                           />
                                           <div className="min-w-0">
-                                            <div className="truncate text-sm font-medium">
-                                              {t.description || cat?.name || "Sem descrição"}
+                                            <div className="flex flex-wrap items-center gap-2">
+                                              <span className="truncate text-sm font-medium">
+                                                {t.description || cat?.name || "Sem descrição"}
+                                              </span>
+                                              {t.card_last4 && (
+                                                <span className="rounded border border-muted-foreground/25 px-1.5 py-0 font-mono text-[10px] text-muted-foreground">
+                                                  {t.card_last4.startsWith("@")
+                                                    ? t.card_last4
+                                                    : `•••• ${t.card_last4}`}
+                                                </span>
+                                              )}
+                                              {t.purchase_type === "installment" && (
+                                                <span className="rounded border border-indigo-500/40 px-1.5 py-0 text-[10px] text-indigo-600 dark:text-indigo-400">
+                                                  Parcelado
+                                                </span>
+                                              )}
                                             </div>
                                             <div className="text-xs text-muted-foreground">
                                               {catFullName(cat, cats)} •{" "}
                                               {new Date(t.date + "T00:00:00").toLocaleDateString("pt-BR")}
                                             </div>
                                           </div>
+
                                         </button>
                                         <div className="flex items-center gap-3">
                                           <div
