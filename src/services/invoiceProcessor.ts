@@ -561,5 +561,67 @@ export function applySuggestions(
       suggestionConfidence: res.confidence,
       suggestionSource: res.source,
     };
-  });
+});
 }
+
+// ---------- Cartão e tipo de compra ----------
+
+/**
+ * Deriva o tipo da compra a partir de indicadores de parcelamento.
+ * - Se `parcela_total > 1` ou `parcela_atual >= 1` → "installment".
+ * - Se a descrição casa com `detectParcel` → "installment".
+ * - Caso contrário → "cash".
+ */
+export function derivePurchaseType(input: {
+  description?: string;
+  parcela_atual?: number | null;
+  parcela_total?: number | null;
+}): "cash" | "installment" {
+  const pa = Number(input.parcela_atual ?? 0);
+  const pt = Number(input.parcela_total ?? 0);
+  if ((pt && pt > 1) || (pa && pa >= 1 && pt && pt >= 1 && pa <= pt)) {
+    return "installment";
+  }
+  if (input.description && detectParcel(input.description)) {
+    return "installment";
+  }
+  return "cash";
+}
+
+/**
+ * Extrai um "final de cartão" (últimos 4 dígitos) de uma linha da fatura.
+ * - Aceita "**** 4437", "XXXX 4437", "4258 XXXX XXXX 4437".
+ * - Retorna null se não encontrar.
+ */
+export function extractCardLast4(text: string): string | null {
+  if (!text) return null;
+  const patterns: RegExp[] = [
+    /\b\d{4}\s?[\dxX*]{4}\s?[\dxX*]{4}\s?(\d{4})\b/,
+    /(?:\*{2,}|[xX]{2,})\s?(\d{4})\b/,
+    /final\s*(?:do\s*)?cart(?:[aã]o)?\s*[:\-]?\s*(\d{4})/i,
+    /cart(?:[aã]o)\s*(?:final|term\.?)\s*[:\-]?\s*(\d{4})/i,
+  ];
+  for (const re of patterns) {
+    const m = text.match(re);
+    if (m && m[1]) return m[1];
+  }
+  return null;
+}
+
+/**
+ * Marcadores textuais para compras online quando não há final de cartão físico.
+ */
+const ONLINE_HINTS = /\b(online|internet|e-?commerce|virtual|digital|iof|paypal)\b/i;
+
+export function normalizeCardLast4(
+  raw: string | null | undefined,
+  description?: string,
+): string | null {
+  const val = (raw ?? "").toString().trim();
+  if (val.startsWith("@")) return val.slice(0, 24);
+  if (/^\d{4}$/.test(val)) return val;
+  if (val && val.length <= 8) return val;
+  if (description && ONLINE_HINTS.test(description)) return "@online";
+  return null;
+}
+
