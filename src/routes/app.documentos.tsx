@@ -439,7 +439,10 @@ function DocumentosPage() {
           source: "pdf" as const,
           document_id: docId,
           merchant: s.comerciante ?? null,
+          card_last4: s.card_last4 ?? null,
+          purchase_type: s.purchase_type ?? "cash",
         };
+
       });
       const { error } = await supabase.from("transactions").upsert(rows, { onConflict: "user_id,date,amount,description", ignoreDuplicates: true });
       if (error) throw error;
