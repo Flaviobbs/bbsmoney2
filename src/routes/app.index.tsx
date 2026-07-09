@@ -293,10 +293,35 @@ function Dashboard() {
     return Array.from(buckets.values());
   }, [tx, catChartId, catChartType, descendantIds, period, periodEnd, periodMonths, now]);
 
-  const catOptions = useMemo(
-    () => cats.filter((c) => c.type === catChartType).sort((a, b) => a.name.localeCompare(b.name)),
-    [cats, catChartType],
-  );
+  const catOptions = useMemo(() => {
+    const filtered = cats.filter((c) => c.type === catChartType);
+    const parents = filtered
+      .filter((c) => !c.parent_id)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const childrenByParent = new Map<string, typeof filtered>();
+    filtered
+      .filter((c) => c.parent_id)
+      .forEach((c) => {
+        const arr = childrenByParent.get(c.parent_id!) ?? [];
+        arr.push(c);
+        childrenByParent.set(c.parent_id!, arr);
+      });
+    const ordered: typeof filtered = [];
+    parents.forEach((p) => {
+      ordered.push(p);
+      (childrenByParent.get(p.id) ?? [])
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .forEach((child) => ordered.push(child));
+    });
+    const parentIds = new Set(parents.map((p) => p.id));
+    filtered
+      .filter((c) => c.parent_id && !parentIds.has(c.parent_id))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .forEach((c) => {
+        if (!ordered.includes(c)) ordered.push(c);
+      });
+    return ordered;
+  }, [cats, catChartType]);
 
   const selectedCat = cats.find((c) => c.id === catChartId);
 
