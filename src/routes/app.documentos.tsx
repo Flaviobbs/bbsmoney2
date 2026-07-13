@@ -884,12 +884,12 @@ function DocumentosPage() {
                 return (
                   <div key={i} className="rounded border-l-2 border-amber-500/60 bg-muted/30 px-2 py-1">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="truncate">{s.data} · {s.descricao}</span>
+                      <span className="truncate">{formatDateBR(s.data)} · {s.descricao}</span>
                       <span className="tabular-nums font-medium">{formatCurrency(Number(s.valor))}</span>
                     </div>
                     {match && (
                       <div className="mt-0.5 text-xs text-muted-foreground">
-                        ↳ mescla com: {match.date} · {match.description} · cadastrada em {new Date(match.created_at).toLocaleString("pt-BR")}
+                        ↳ mescla com: {formatDateBR(match.date)} · {match.description} · cadastrada em {new Date(match.created_at).toLocaleString("pt-BR")}
                       </div>
                     )}
                   </div>
