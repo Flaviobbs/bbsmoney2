@@ -720,7 +720,7 @@ function DocumentosPage() {
                             )}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {s.data} · {isInstallment ? "Parcelamento" : "Despesa"}
+                            {formatDateBR(s.data)} · {isInstallment ? "Parcelamento" : "Despesa"}
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-2">
                             <Select
