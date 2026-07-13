@@ -856,7 +856,7 @@ function DocumentosPage() {
                 <div>
                   <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Nova sugestão</div>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="truncate">{s.data} · {s.descricao}</span>
+                    <span className="truncate">{formatDateBR(s.data)} · {s.descricao}</span>
                     <span className="tabular-nums font-medium">{formatCurrency(Number(s.valor))}</span>
                   </div>
                 </div>
