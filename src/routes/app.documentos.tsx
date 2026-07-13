@@ -863,7 +863,7 @@ function DocumentosPage() {
                 <div className="border-t pt-2">
                   <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Transação existente</div>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="truncate">{match.date} · {match.description}</span>
+                    <span className="truncate">{formatDateBR(match.date)} · {match.description}</span>
                     <span className="tabular-nums font-medium">{formatCurrency(Number(match.amount))}</span>
                   </div>
                   <div className="text-xs text-muted-foreground">
