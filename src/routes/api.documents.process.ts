@@ -137,12 +137,15 @@ export const Route = createFileRoute("/api/documents/process")({
                   role: "system",
                   content:
                     `Você analisa extratos/faturas/recibos em PT-BR e extrai transações. Use SOMENTE valores presentes no texto. ` +
-                    `Categorize com base na lista fornecida; se nenhuma encaixar, use 'Outros'. Datas no formato AAAA-MM-DD. ` +
+                    `Categorize com base na lista fornecida; se nenhuma encaixar, use 'Outros'. Datas SEMPRE no formato ISO AAAA-MM-DD. ` +
                     `Hoje é ${todayBR} (America/Sao_Paulo). NUNCA retorne datas no futuro — se a data extraída for posterior a ${todayBR}, recue para o ano anterior. ` +
-                    `Para faturas de cartão de crédito: tente identificar a data de vencimento/mês de referência da fatura. ` +
+                    `DATA POR TRANSAÇÃO (OBRIGATÓRIO): para CADA linha de transação, extraia a data ESPECÍFICA daquela linha, exatamente como impressa (formatos comuns: "dd/mm", "dd/mm/aaaa", "dd MMM", "dd-mm"). ` +
+                    `NÃO use a mesma data (vencimento/fechamento da fatura) para todas as transações. Se a linha exibir apenas "dd/mm", use o ANO do mês de referência da fatura (retroagindo se necessário para não gerar datas futuras). ` +
+                    `Somente use a data de vencimento/fechamento da fatura como último recurso, quando aquela linha específica realmente não trouxer nenhuma data. ` +
+                    `Para faturas de cartão de crédito, identifique também o mês de referência apenas como contexto para inferir o ano das datas dd/mm. ` +
                     `COMPRAS PARCELADAS: identifique QUALQUER indicativo de parcelamento no texto — "PARC 03/12", "1/10", "PARCELA 2 DE 6", "em 10x", "10x sem juros", "3 vezes", "parcelado em 6x", "(2/12)". Para essas compras preencha SEMPRE "parcela_atual" e "parcela_total" (se só souber o total, use parcela_atual=1). ` +
                     `Inclua APENAS a parcela do mês atual da fatura (não gere parcelas futuras). ` +
-                    `Para parcelas, o campo "data" deve ser a data de vencimento/pagamento daquela parcela (mês da fatura), NÃO a data da compra original. ` +
+                    `Para parcelas, o campo "data" deve ser a data da COMPRA ORIGINAL impressa naquela linha (não a data de vencimento da parcela). ` +
                     `Compras à vista (sem nenhum marcador de parcela) NÃO devem receber parcela_atual/parcela_total. ` +
                     `IDENTIFICAÇÃO DE CARTÃO: quando a fatura listar transações por titular/cartão (ex: "PORTADOR: FULANO", "CARTÃO FINAL 4437", "**** 4437", "4258 XXXX XXXX 4437"), preencha "card_last4" com APENAS os 4 últimos dígitos do cartão daquela transação. Para compras marcadas como online/internet/e-commerce sem cartão físico identificável, use "@online".`,
                 },

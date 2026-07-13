@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Loader2, Upload, FileText, Trash2, Check, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDateBR } from "@/lib/format";
 import { suggestCategoryDetailed, learnCategory, seedLearningFromHistory } from "@/services/invoiceProcessor";
 import {
   Select,
@@ -720,7 +720,7 @@ function DocumentosPage() {
                             )}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {s.data} · {isInstallment ? "Parcelamento" : "Despesa"}
+                            {formatDateBR(s.data)} · {isInstallment ? "Parcelamento" : "Despesa"}
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-2">
                             <Select
@@ -856,14 +856,14 @@ function DocumentosPage() {
                 <div>
                   <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Nova sugestão</div>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="truncate">{s.data} · {s.descricao}</span>
+                    <span className="truncate">{formatDateBR(s.data)} · {s.descricao}</span>
                     <span className="tabular-nums font-medium">{formatCurrency(Number(s.valor))}</span>
                   </div>
                 </div>
                 <div className="border-t pt-2">
                   <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Transação existente</div>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="truncate">{match.date} · {match.description}</span>
+                    <span className="truncate">{formatDateBR(match.date)} · {match.description}</span>
                     <span className="tabular-nums font-medium">{formatCurrency(Number(match.amount))}</span>
                   </div>
                   <div className="text-xs text-muted-foreground">
@@ -884,12 +884,12 @@ function DocumentosPage() {
                 return (
                   <div key={i} className="rounded border-l-2 border-amber-500/60 bg-muted/30 px-2 py-1">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="truncate">{s.data} · {s.descricao}</span>
+                      <span className="truncate">{formatDateBR(s.data)} · {s.descricao}</span>
                       <span className="tabular-nums font-medium">{formatCurrency(Number(s.valor))}</span>
                     </div>
                     {match && (
                       <div className="mt-0.5 text-xs text-muted-foreground">
-                        ↳ mescla com: {match.date} · {match.description} · cadastrada em {new Date(match.created_at).toLocaleString("pt-BR")}
+                        ↳ mescla com: {formatDateBR(match.date)} · {match.description} · cadastrada em {new Date(match.created_at).toLocaleString("pt-BR")}
                       </div>
                     )}
                   </div>
@@ -1008,7 +1008,7 @@ function DocumentosPage() {
                 <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sugestão do PDF</div>
                 <div className="mt-1 font-medium">{dupDetails.suggestion.descricao}</div>
                 <div className="mt-0.5 flex items-center justify-between gap-2 text-muted-foreground">
-                  <span>{dupDetails.suggestion.data} · {dupDetails.suggestion.categoria}</span>
+                  <span>{formatDateBR(dupDetails.suggestion.data)} · {dupDetails.suggestion.categoria}</span>
                   <span className="tabular-nums font-semibold text-foreground">
                     {formatCurrency(Number(dupDetails.suggestion.valor))}
                   </span>
@@ -1021,7 +1021,7 @@ function DocumentosPage() {
                 <div className="mt-1 font-medium">{dupDetails.existing.description}</div>
                 <div className="mt-0.5 flex items-center justify-between gap-2 text-muted-foreground">
                   <span>
-                    {dupDetails.existing.date} · cadastrada em{" "}
+                    {formatDateBR(dupDetails.existing.date)} · cadastrada em{" "}
                     {new Date(dupDetails.existing.created_at).toLocaleString("pt-BR")}
                   </span>
                   <span className="tabular-nums font-semibold text-foreground">
