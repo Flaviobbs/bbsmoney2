@@ -1021,7 +1021,7 @@ function DocumentosPage() {
                 <div className="mt-1 font-medium">{dupDetails.existing.description}</div>
                 <div className="mt-0.5 flex items-center justify-between gap-2 text-muted-foreground">
                   <span>
-                    {dupDetails.existing.date} · cadastrada em{" "}
+                    {formatDateBR(dupDetails.existing.date)} · cadastrada em{" "}
                     {new Date(dupDetails.existing.created_at).toLocaleString("pt-BR")}
                   </span>
                   <span className="tabular-nums font-semibold text-foreground">
