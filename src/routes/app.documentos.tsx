@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Loader2, Upload, FileText, Trash2, Check, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDateBR } from "@/lib/format";
 import { suggestCategoryDetailed, learnCategory, seedLearningFromHistory } from "@/services/invoiceProcessor";
 import {
   Select,
