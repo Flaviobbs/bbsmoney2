@@ -1008,7 +1008,7 @@ function DocumentosPage() {
                 <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sugestão do PDF</div>
                 <div className="mt-1 font-medium">{dupDetails.suggestion.descricao}</div>
                 <div className="mt-0.5 flex items-center justify-between gap-2 text-muted-foreground">
-                  <span>{dupDetails.suggestion.data} · {dupDetails.suggestion.categoria}</span>
+                  <span>{formatDateBR(dupDetails.suggestion.data)} · {dupDetails.suggestion.categoria}</span>
                   <span className="tabular-nums font-semibold text-foreground">
                     {formatCurrency(Number(dupDetails.suggestion.valor))}
                   </span>
