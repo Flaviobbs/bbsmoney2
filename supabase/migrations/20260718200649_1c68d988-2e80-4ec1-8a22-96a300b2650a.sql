@@ -1,0 +1,1 @@
+UPDATE public.documents SET status = 'uploaded', error_message = 'Processamento interrompido — reenvie o processamento' WHERE status = 'processing';
