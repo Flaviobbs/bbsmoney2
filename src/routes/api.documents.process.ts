@@ -220,6 +220,79 @@ export const Route = createFileRoute("/api/documents/process")({
             normalizeCardLast4,
           } = await import("@/services/invoiceProcessor");
 
+          // ── Recuperador determinístico de datas ────────────────────────
+          // O Gemini frequentemente colapsa todas as datas no vencimento da
+          // fatura. Aqui varremos o próprio texto do PDF, extraindo tuplas
+          // (dd/mm, descrição, valor) linha a linha e usamos amount+desc
+          // para recuperar a data específica de cada transação.
+          const closingMatch =
+            rawText.match(/Vencimento[^\d]*(\d{2})\/(\d{2})\/(\d{4})/i) ??
+            rawText.match(/at[eé]\s+(\d{2})\/(\d{2})\/(\d{4})/i);
+          const refYear = closingMatch
+            ? Number(closingMatch[3])
+            : new Date().getUTCFullYear();
+          const closingISO = closingMatch
+            ? `${closingMatch[3]}-${closingMatch[2]}-${closingMatch[1]}`
+            : todayBR;
+
+          type LineEntry = { iso: string; amountCents: number; desc: string };
+          const lineEntries: LineEntry[] = [];
+          // Padrão: opcional "n " (agrupador) + dd/mm + descrição + [parcela xx/xx] + valor brasileiro
+          const lineRe =
+            /(?:^|\s)(?:\d{1,2}\s+)?(\d{2})\/(\d{2})\s+([A-Za-zÀ-ÿ0-9*][A-Za-zÀ-ÿ0-9*\s.,'&/\-]{2,80}?)\s+(?:\d{1,2}\/\d{1,2}\s+)?(-?\d{1,3}(?:\.\d{3})*,\d{2})(?=\s|$)/g;
+          for (const m of rawText.matchAll(lineRe)) {
+            const dd = Number(m[1]);
+            const mm = Number(m[2]);
+            if (dd < 1 || dd > 31 || mm < 1 || mm > 12) continue;
+            const desc = m[3].trim();
+            const amountCents = Math.round(
+              Math.abs(Number(m[4].replace(/\./g, "").replace(",", "."))) * 100,
+            );
+            if (!amountCents) continue;
+            let iso = `${refYear}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+            if (iso > closingISO) {
+              iso = `${refYear - 1}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+            }
+            lineEntries.push({ iso, amountCents, desc });
+          }
+
+          const normDesc = (s: string) =>
+            s
+              .toLowerCase()
+              .replace(/[^a-z0-9\s]/g, " ")
+              .replace(/\s+/g, " ")
+              .trim();
+          const byAmount = new Map<number, LineEntry[]>();
+          for (const e of lineEntries) {
+            const arr = byAmount.get(e.amountCents) ?? [];
+            arr.push(e);
+            byAmount.set(e.amountCents, arr);
+          }
+          function recoverDate(
+            descricao: string,
+            valor: number,
+            fallback: string,
+          ): { iso: string; recovered: boolean } {
+            const cents = Math.round(Math.abs(valor) * 100);
+            const candidates = byAmount.get(cents) ?? [];
+            if (!candidates.length) return { iso: fallback, recovered: false };
+            if (candidates.length === 1) return { iso: candidates[0].iso, recovered: true };
+            // Desambigua por sobreposição de tokens da descrição
+            const sugTokens = new Set(normDesc(descricao).split(" ").filter((t) => t.length >= 3));
+            let best = candidates[0];
+            let bestScore = -1;
+            for (const c of candidates) {
+              const cTokens = normDesc(c.desc).split(" ").filter((t) => t.length >= 3);
+              let score = 0;
+              for (const t of cTokens) if (sugTokens.has(t)) score += 1;
+              if (score > bestScore) {
+                bestScore = score;
+                best = c;
+              }
+            }
+            return { iso: best.iso, recovered: true };
+          }
+
           // Sanitiza datas + injeta card_last4 / purchase_type / marca duplicatas.
           const isoDate = /^\d{4}-\d{2}-\d{2}$/;
           const suggestions = rawSuggestions.map((s) => {
@@ -234,6 +307,13 @@ export const Route = createFileRoute("/api/documents/process")({
             }
             const descricao = String(s.descricao ?? "");
             const valor = Number(s.valor ?? 0);
+
+            // Se o AI usou a data de vencimento OU alguma data claramente errada,
+            // tenta recuperar a data real a partir do texto do PDF.
+            const recovered = recoverDate(descricao, valor, safeDate);
+            if (recovered.recovered) {
+              safeDate = recovered.iso;
+            }
             const purchase_type = derivePurchaseType({
               description: descricao,
               parcela_atual: (s.parcela_atual as number | undefined) ?? null,
