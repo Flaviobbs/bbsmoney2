@@ -4,14 +4,26 @@ import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 
-export function GoogleSignInButton({ label = "Continuar com Google" }: { label?: string }) {
+function safeNext(next?: string) {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return null;
+  return next;
+}
+
+export function GoogleSignInButton({
+  label = "Continuar com Google",
+  next,
+}: {
+  label?: string;
+  next?: string;
+}) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const safe = safeNext(next);
 
   const onClick = async () => {
     setLoading(true);
     const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin + "/app",
+      redirect_uri: window.location.origin + (safe ?? "/app"),
     });
     if (result.error) {
       setLoading(false);
@@ -19,7 +31,8 @@ export function GoogleSignInButton({ label = "Continuar com Google" }: { label?:
       return;
     }
     if (result.redirected) return;
-    navigate({ to: "/app" });
+    if (safe) window.location.href = safe;
+    else navigate({ to: "/app" });
   };
 
   return (
