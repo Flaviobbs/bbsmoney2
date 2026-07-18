@@ -9,11 +9,21 @@ import { toast } from "sonner";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 
 export const Route = createFileRoute("/login")({
+  validateSearch: (s: Record<string, unknown>) => ({
+    next: typeof s.next === "string" ? s.next : undefined,
+  }),
   component: LoginPage,
 });
 
+function safeNext(next?: string) {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return null;
+  return next;
+}
+
 function LoginPage() {
   const navigate = useNavigate();
+  const { next } = Route.useSearch();
+  const safe = safeNext(next);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,7 +38,8 @@ function LoginPage() {
       return;
     }
     toast.success("Bem-vindo de volta!");
-    navigate({ to: "/app" });
+    if (safe) window.location.href = safe;
+    else navigate({ to: "/app" });
   };
 
   return (
@@ -60,10 +71,10 @@ function LoginPage() {
           <span className="text-xs text-muted-foreground">ou</span>
           <div className="h-px flex-1 bg-border" />
         </div>
-        <GoogleSignInButton label="Entrar com Google" />
+        <GoogleSignInButton label="Entrar com Google" next={safe ?? undefined} />
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Ainda não tem conta?{" "}
-          <Link to="/signup" className="text-primary hover:underline">Criar conta</Link>
+          <Link to="/signup" search={safe ? { next: safe } : undefined} className="text-primary hover:underline">Criar conta</Link>
         </p>
       </div>
     </div>
