@@ -814,6 +814,8 @@ function EditCategoryDialog({
 }) {
   const [categoryId, setCategoryId] = useState<string>("");
   const [date, setDate] = useState<string>("");
+  const [description, setDescription] = useState<string>("");
+  const [notes, setNotes] = useState<string>("");
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState(COLORS[0]);
@@ -824,12 +826,15 @@ function EditCategoryDialog({
     if (tx) {
       setCategoryId(tx.category_id ?? "");
       setDate(tx.date);
+      setDescription(tx.description ?? "");
+      setNotes(tx.notes ?? "");
       setCreating(false);
       setNewName("");
       setNewColor(COLORS[0]);
       setApplyAll(true);
     }
   }, [tx]);
+
 
 
   if (!tx) return null;
