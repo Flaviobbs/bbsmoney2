@@ -92,6 +92,7 @@ function DocumentosPage() {
     value: string;
     save: boolean;
   } | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<Record<string, string>>({});
 
   const load = async () => {
     if (!user) return;
@@ -388,16 +389,38 @@ function DocumentosPage() {
     });
   };
 
-  const toggleSelectAll = (docId: string, total: number) => {
+  const matchesCategoryFilter = (docId: string, s: Suggestion) => {
+    const f = categoryFilter[docId];
+    if (!f || f === "all") return true;
+    if (f === "__none__") return !s.categoria || s.categoria.trim() === "";
+    const target = categories.find((c) => c.id === f);
+    if (!target) return true;
+    const allowedNames = new Set<string>([target.name.toLowerCase()]);
+    // se for pai, aceita também subcategorias
+    categories
+      .filter((c) => c.parent_id === target.id)
+      .forEach((c) => allowedNames.add(c.name.toLowerCase()));
+    return allowedNames.has((s.categoria ?? "").toLowerCase());
+  };
+
+  const visibleIndices = (docId: string): number[] => {
+    const ex = extractions[docId];
+    if (!ex) return [];
+    return ex.suggestions
+      .map((s, i) => ({ s, i }))
+      .filter(({ s }) => matchesCategoryFilter(docId, s))
+      .map(({ i }) => i);
+  };
+
+  const toggleSelectAll = (docId: string) => {
     setSelected((prev) => {
       const ex = extractions[docId];
-      const selectable = ex
-        ? ex.suggestions
-            .map((s, i) => (s.already_imported ? -1 : i))
-            .filter((i) => i >= 0)
-        : Array.from({ length: total }, (_, i) => i);
+      if (!ex) return prev;
+      const selectable = visibleIndices(docId).filter(
+        (i) => !ex.suggestions[i]?.already_imported,
+      );
       const set = prev[docId] ?? new Set<number>();
-      if (set.size >= selectable.length && selectable.every((i) => set.has(i)))
+      if (selectable.every((i) => set.has(i)) && selectable.length > 0)
         return { ...prev, [docId]: new Set() };
       return { ...prev, [docId]: new Set(selectable) };
     });
@@ -625,38 +648,110 @@ function DocumentosPage() {
                     {ex.suggestions.length === 0 && (
                       <div className="text-sm text-muted-foreground">Sem sugestões.</div>
                     )}
-                    {ex.suggestions.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-2 pb-1">
-                        <Checkbox
-                          checked={
-                            (selected[d.id]?.size ?? 0) === ex.suggestions.length &&
-                            ex.suggestions.length > 0
-                          }
-                          onCheckedChange={() => toggleSelectAll(d.id, ex.suggestions.length)}
-                        />
-                        <span className="text-xs text-muted-foreground">
-                          {selected[d.id]?.size ?? 0} de {ex.suggestions.length} selecionadas
-                        </span>
-                        <div className="ml-auto flex gap-2">
-                          <Button
-                            size="sm"
-                            disabled={bulkBusy || !(selected[d.id]?.size)}
-                            onClick={() => bulkApprove(d.id)}
+                    {ex.suggestions.length > 0 && (() => {
+                      const exp = categories.filter((c) => c.type === "expense");
+                      const parents = exp
+                        .filter((c) => !c.parent_id)
+                        .sort((a, b) => a.name.localeCompare(b.name));
+                      const childrenOf = (pid: string) =>
+                        exp
+                          .filter((c) => c.parent_id === pid)
+                          .sort((a, b) => a.name.localeCompare(b.name));
+                      // contagens por categoria (case-insensitive)
+                      const counts = new Map<string, number>();
+                      let noneCount = 0;
+                      ex.suggestions.forEach((s) => {
+                        const n = (s.categoria ?? "").trim().toLowerCase();
+                        if (!n) noneCount++;
+                        else counts.set(n, (counts.get(n) ?? 0) + 1);
+                      });
+                      const countFor = (cat: { id: string; name: string }) => {
+                        let total = counts.get(cat.name.toLowerCase()) ?? 0;
+                        childrenOf(cat.id).forEach((ch) => {
+                          total += counts.get(ch.name.toLowerCase()) ?? 0;
+                        });
+                        return total;
+                      };
+                      const currentFilter = categoryFilter[d.id] ?? "all";
+                      const visible = visibleIndices(d.id);
+                      const selectedInVisible = visible.filter((i) => selected[d.id]?.has(i)).length;
+                      return (
+                        <div className="flex flex-wrap items-center gap-2 pb-1">
+                          <Checkbox
+                            checked={
+                              visible.length > 0 &&
+                              visible.every((i) => selected[d.id]?.has(i))
+                            }
+                            onCheckedChange={() => toggleSelectAll(d.id)}
+                          />
+                          <span className="text-xs text-muted-foreground">
+                            {selectedInVisible} de {visible.length} selecionadas
+                            {currentFilter !== "all" ? " (filtradas)" : ""}
+                          </span>
+                          <Select
+                            value={currentFilter}
+                            onValueChange={(v) =>
+                              setCategoryFilter((prev) => ({ ...prev, [d.id]: v }))
+                            }
                           >
-                            <Check className="h-4 w-4" /> Aprovar selecionadas
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={bulkBusy || !(selected[d.id]?.size)}
-                            onClick={() => bulkReject(d.id)}
-                          >
-                            <X className="h-4 w-4" /> Rejeitar selecionadas
-                          </Button>
+                            <SelectTrigger className="h-8 w-[260px] text-xs">
+                              <SelectValue placeholder="Filtrar por categoria" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">
+                                Todas as categorias ({ex.suggestions.length})
+                              </SelectItem>
+                              {noneCount > 0 && (
+                                <SelectItem value="__none__">
+                                  Sem categoria ({noneCount})
+                                </SelectItem>
+                              )}
+                              {parents.flatMap((p) => {
+                                const pCount = countFor(p);
+                                const nodes: ReactNode[] = [];
+                                if (pCount > 0)
+                                  nodes.push(
+                                    <SelectItem key={p.id} value={p.id}>
+                                      {p.name} ({pCount})
+                                    </SelectItem>,
+                                  );
+                                childrenOf(p.id).forEach((c) => {
+                                  const cc = counts.get(c.name.toLowerCase()) ?? 0;
+                                  if (cc > 0)
+                                    nodes.push(
+                                      <SelectItem key={c.id} value={c.id}>
+                                        <span className="pl-4 text-muted-foreground">
+                                          ↳ {c.name} ({cc})
+                                        </span>
+                                      </SelectItem>,
+                                    );
+                                });
+                                return nodes;
+                              })}
+                            </SelectContent>
+                          </Select>
+                          <div className="ml-auto flex gap-2">
+                            <Button
+                              size="sm"
+                              disabled={bulkBusy || !(selected[d.id]?.size)}
+                              onClick={() => bulkApprove(d.id)}
+                            >
+                              <Check className="h-4 w-4" /> Aprovar selecionadas
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={bulkBusy || !(selected[d.id]?.size)}
+                              onClick={() => bulkReject(d.id)}
+                            >
+                              <X className="h-4 w-4" /> Rejeitar selecionadas
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                     {ex.suggestions.map((s, i) => {
+                      if (!matchesCategoryFilter(d.id, s)) return null;
                       const k = dupKey(s.data, Number(s.valor), s.descricao);
                       const match = (dupMatches[d.id] ?? {})[k];
                       const alreadyImported = !!s.already_imported;
