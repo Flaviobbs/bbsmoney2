@@ -982,6 +982,9 @@ function EditCategoryDialog({
               placeholder="Anotações internas sobre esta transação"
               rows={3}
             />
+          </div>
+
+
 
 
 
