@@ -137,10 +137,10 @@ function Dashboard() {
       const in7 = new Date();
       in7.setDate(in7.getDate() + 7);
       const in7ISO = in7.toISOString().slice(0, 10);
-      const [{ data: t }, { data: c }, { data: ub }] = await Promise.all([
+      const [{ data: t }, { data: c }, { data: ub }, { data: d }] = await Promise.all([
         supabase
           .from("transactions")
-          .select("id,type,amount,date,description,category_id,card_last4,purchase_type")
+          .select("id,type,amount,date,description,category_id,card_last4,purchase_type,document_id")
           .gte("date", periodStart)
           .lte("date", periodEnd)
           .order("date", { ascending: false }),
@@ -154,12 +154,15 @@ function Dashboard() {
           .lte("due_date", in7ISO)
           .order("due_date", { ascending: true })
           .limit(5),
+        supabase.from("documents").select("id,file_name"),
       ]);
       setTx((t ?? []) as TxRow[]);
       setCats((c ?? []) as CatRow[]);
       setUpcoming((ub ?? []) as UpcomingBill[]);
+      setDocs((d ?? []) as DocRow[]);
       setLoading(false);
     };
+
     load();
   }, [user, periodStart, periodEnd]);
 
