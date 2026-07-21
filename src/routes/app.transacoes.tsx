@@ -885,7 +885,7 @@ function EditCategoryDialog({
 
     // 1) Atualiza data / descrição / notas apenas no lançamento atual
     if (dateChanged || descChanged || notesChanged) {
-      const patch: Record<string, unknown> = {};
+      const patch: { date?: string; description?: string; notes?: string | null } = {};
       if (dateChanged) patch.date = date;
       if (descChanged) patch.description = newDesc;
       if (notesChanged) patch.notes = newNotes;
