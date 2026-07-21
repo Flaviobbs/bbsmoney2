@@ -962,6 +962,28 @@ function EditCategoryDialog({
             </p>
           </div>
 
+          <div className="space-y-2">
+            <Label>Descrição</Label>
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Ex.: Supermercado"
+            />
+            <p className="text-xs text-muted-foreground">
+              A alteração de descrição se aplica somente a este lançamento.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Notas / comentários</Label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Anotações internas sobre esta transação"
+              rows={3}
+            />
+
+
 
           {!creating ? (
             <>
