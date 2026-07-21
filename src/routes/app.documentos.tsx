@@ -92,6 +92,7 @@ function DocumentosPage() {
     value: string;
     save: boolean;
   } | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<Record<string, string>>({});
 
   const load = async () => {
     if (!user) return;
