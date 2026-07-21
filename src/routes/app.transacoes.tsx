@@ -878,18 +878,27 @@ function EditCategoryDialog({
     }
     const dateChanged = date !== tx.date;
     const desc = (tx.description ?? "").trim();
+    const newDesc = description.trim();
+    const descChanged = newDesc !== (tx.description ?? "");
+    const newNotes = notes.trim() ? notes.trim() : null;
+    const notesChanged = (newNotes ?? "") !== (tx.notes ?? "");
 
-    // 1) Atualiza data sempre apenas no lançamento atual
-    if (dateChanged) {
+    // 1) Atualiza data / descrição / notas apenas no lançamento atual
+    if (dateChanged || descChanged || notesChanged) {
+      const patch: Record<string, unknown> = {};
+      if (dateChanged) patch.date = date;
+      if (descChanged) patch.description = newDesc;
+      if (notesChanged) patch.notes = newNotes;
       const { error: dErr } = await supabase
         .from("transactions")
-        .update({ date })
+        .update(patch)
         .eq("id", tx.id);
       if (dErr) {
         setSaving(false);
         return toast.error(dErr.message);
       }
     }
+
 
     // 2) Atualiza categoria (no atual ou em todos com mesma descrição)
     let query = supabase
