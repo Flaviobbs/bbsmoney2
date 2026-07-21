@@ -305,6 +305,24 @@ function Dashboard() {
     return Array.from(buckets.values());
   }, [tx, catChartId, catChartType, descendantIds, period, periodEnd, periodMonths, now]);
 
+  const docExpenses = useMemo(() => {
+    const totals = new Map<string, number>();
+    tx.forEach((t) => {
+      if (t.type !== "expense" || !t.document_id) return;
+      totals.set(t.document_id, (totals.get(t.document_id) ?? 0) + Number(t.amount));
+    });
+    const nameById = new Map(docs.map((d) => [d.id, d.file_name]));
+    return Array.from(totals.entries())
+      .map(([id, total]) => ({
+        id,
+        name: (nameById.get(id) ?? "Documento").replace(/\.pdf$/i, ""),
+        total: Math.round(total * 100) / 100,
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 20);
+  }, [tx, docs]);
+
+
   const catOptions = useMemo(() => {
     const filtered = cats.filter((c) => c.type === catChartType);
     const parents = filtered
