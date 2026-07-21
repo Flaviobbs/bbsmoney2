@@ -608,15 +608,13 @@ function Dashboard() {
                   width={160}
                   tick={{ fontSize: 11 }}
                 />
-                <RTooltip
+                <Tooltip
                   formatter={(v: number) => formatCurrency(Number(v))}
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--popover))",
-                    color: "hsl(var(--popover-foreground))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: 8,
-                  }}
+                  contentStyle={chartTooltip}
+                  itemStyle={chartTooltipItem}
+                  labelStyle={chartTooltipLabel}
                 />
+
                 <Bar
                   dataKey="total"
                   name="Despesas"
