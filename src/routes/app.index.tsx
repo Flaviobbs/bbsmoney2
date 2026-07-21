@@ -75,8 +75,10 @@ function Dashboard() {
   const { user } = useAuth();
   const [tx, setTx] = useState<TxRow[]>([]);
   const [cats, setCats] = useState<CatRow[]>([]);
+  const [docs, setDocs] = useState<DocRow[]>([]);
   const [upcoming, setUpcoming] = useState<UpcomingBill[]>([]);
   const [loading, setLoading] = useState(true);
+
 
   type PeriodOption = "1m" | "3m" | "6m" | "12m" | "custom";
   const [period, setPeriod] = useState<PeriodOption>("6m");
