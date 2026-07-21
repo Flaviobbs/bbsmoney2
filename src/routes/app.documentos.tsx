@@ -655,7 +655,7 @@ function DocumentosPage() {
                             (selected[d.id]?.size ?? 0) === ex.suggestions.length &&
                             ex.suggestions.length > 0
                           }
-                          onCheckedChange={() => toggleSelectAll(d.id, ex.suggestions.length)}
+                          onCheckedChange={() => toggleSelectAll(d.id)}
                         />
                         <span className="text-xs text-muted-foreground">
                           {selected[d.id]?.size ?? 0} de {ex.suggestions.length} selecionadas
