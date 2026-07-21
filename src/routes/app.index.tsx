@@ -590,6 +590,49 @@ function Dashboard() {
 
       <Card>
         <CardHeader>
+          <CardTitle className="text-base">Despesas por documento (fatura)</CardTitle>
+        </CardHeader>
+        <CardContent className="h-[320px]">
+          {docExpenses.length === 0 ? (
+            <p className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              Nenhuma despesa associada a documentos no período.
+            </p>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={docExpenses} layout="vertical" margin={{ left: 8, right: 16 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" tickFormatter={(v) => formatCurrency(Number(v))} />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  width={160}
+                  tick={{ fontSize: 11 }}
+                />
+                <RTooltip
+                  formatter={(v: number) => formatCurrency(Number(v))}
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--popover))",
+                    color: "hsl(var(--popover-foreground))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: 8,
+                  }}
+                />
+                <Bar
+                  dataKey="total"
+                  name="Despesas"
+                  fill="oklch(0.62 0.24 25)"
+                  radius={[0, 6, 6, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+
+
+      <Card>
+        <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <CalendarClock className="h-4 w-4 text-primary" /> Próximas contas (7 dias)
           </CardTitle>
