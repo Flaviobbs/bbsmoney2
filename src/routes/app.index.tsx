@@ -47,7 +47,14 @@ interface TxRow {
   category_id: string | null;
   card_last4: string | null;
   purchase_type: "cash" | "installment" | null;
+  document_id: string | null;
 }
+
+interface DocRow {
+  id: string;
+  file_name: string;
+}
+
 
 interface CatRow {
   id: string;
@@ -68,8 +75,10 @@ function Dashboard() {
   const { user } = useAuth();
   const [tx, setTx] = useState<TxRow[]>([]);
   const [cats, setCats] = useState<CatRow[]>([]);
+  const [docs, setDocs] = useState<DocRow[]>([]);
   const [upcoming, setUpcoming] = useState<UpcomingBill[]>([]);
   const [loading, setLoading] = useState(true);
+
 
   type PeriodOption = "1m" | "3m" | "6m" | "12m" | "custom";
   const [period, setPeriod] = useState<PeriodOption>("6m");
@@ -128,10 +137,10 @@ function Dashboard() {
       const in7 = new Date();
       in7.setDate(in7.getDate() + 7);
       const in7ISO = in7.toISOString().slice(0, 10);
-      const [{ data: t }, { data: c }, { data: ub }] = await Promise.all([
+      const [{ data: t }, { data: c }, { data: ub }, { data: d }] = await Promise.all([
         supabase
           .from("transactions")
-          .select("id,type,amount,date,description,category_id,card_last4,purchase_type")
+          .select("id,type,amount,date,description,category_id,card_last4,purchase_type,document_id")
           .gte("date", periodStart)
           .lte("date", periodEnd)
           .order("date", { ascending: false }),
@@ -145,12 +154,15 @@ function Dashboard() {
           .lte("due_date", in7ISO)
           .order("due_date", { ascending: true })
           .limit(5),
+        supabase.from("documents").select("id,file_name"),
       ]);
       setTx((t ?? []) as TxRow[]);
       setCats((c ?? []) as CatRow[]);
       setUpcoming((ub ?? []) as UpcomingBill[]);
+      setDocs((d ?? []) as DocRow[]);
       setLoading(false);
     };
+
     load();
   }, [user, periodStart, periodEnd]);
 
@@ -292,6 +304,24 @@ function Dashboard() {
     }
     return Array.from(buckets.values());
   }, [tx, catChartId, catChartType, descendantIds, period, periodEnd, periodMonths, now]);
+
+  const docExpenses = useMemo(() => {
+    const totals = new Map<string, number>();
+    tx.forEach((t) => {
+      if (t.type !== "expense" || !t.document_id) return;
+      totals.set(t.document_id, (totals.get(t.document_id) ?? 0) + Number(t.amount));
+    });
+    const nameById = new Map(docs.map((d) => [d.id, d.file_name]));
+    return Array.from(totals.entries())
+      .map(([id, total]) => ({
+        id,
+        name: (nameById.get(id) ?? "Documento").replace(/\.pdf$/i, ""),
+        total: Math.round(total * 100) / 100,
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 20);
+  }, [tx, docs]);
+
 
   const catOptions = useMemo(() => {
     const filtered = cats.filter((c) => c.type === catChartType);
@@ -557,6 +587,47 @@ function Dashboard() {
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Despesas por documento (fatura)</CardTitle>
+        </CardHeader>
+        <CardContent className="h-[320px]">
+          {docExpenses.length === 0 ? (
+            <p className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              Nenhuma despesa associada a documentos no período.
+            </p>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={docExpenses} layout="vertical" margin={{ left: 8, right: 16 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" tickFormatter={(v) => formatCurrency(Number(v))} />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  width={160}
+                  tick={{ fontSize: 11 }}
+                />
+                <Tooltip
+                  formatter={(v: number) => formatCurrency(Number(v))}
+                  contentStyle={chartTooltip}
+                  itemStyle={chartTooltipItem}
+                  labelStyle={chartTooltipLabel}
+                />
+
+                <Bar
+                  dataKey="total"
+                  name="Despesas"
+                  fill="oklch(0.62 0.24 25)"
+                  radius={[0, 6, 6, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+
 
       <Card>
         <CardHeader>

@@ -5,6 +5,8 @@ import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+
 import {
   Dialog,
   DialogContent,
@@ -58,7 +60,9 @@ interface Tx {
   account_id: string | null;
   card_last4: string | null;
   purchase_type: "cash" | "installment" | null;
+  notes: string | null;
 }
+
 
 interface Cat {
   id: string;
@@ -812,6 +816,8 @@ function EditCategoryDialog({
 }) {
   const [categoryId, setCategoryId] = useState<string>("");
   const [date, setDate] = useState<string>("");
+  const [description, setDescription] = useState<string>("");
+  const [notes, setNotes] = useState<string>("");
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState(COLORS[0]);
@@ -822,12 +828,15 @@ function EditCategoryDialog({
     if (tx) {
       setCategoryId(tx.category_id ?? "");
       setDate(tx.date);
+      setDescription(tx.description ?? "");
+      setNotes(tx.notes ?? "");
       setCreating(false);
       setNewName("");
       setNewColor(COLORS[0]);
       setApplyAll(true);
     }
   }, [tx]);
+
 
 
   if (!tx) return null;
@@ -871,18 +880,27 @@ function EditCategoryDialog({
     }
     const dateChanged = date !== tx.date;
     const desc = (tx.description ?? "").trim();
+    const newDesc = description.trim();
+    const descChanged = newDesc !== (tx.description ?? "");
+    const newNotes = notes.trim() ? notes.trim() : null;
+    const notesChanged = (newNotes ?? "") !== (tx.notes ?? "");
 
-    // 1) Atualiza data sempre apenas no lançamento atual
-    if (dateChanged) {
+    // 1) Atualiza data / descrição / notas apenas no lançamento atual
+    if (dateChanged || descChanged || notesChanged) {
+      const patch: { date?: string; description?: string; notes?: string | null } = {};
+      if (dateChanged) patch.date = date;
+      if (descChanged) patch.description = newDesc;
+      if (notesChanged) patch.notes = newNotes;
       const { error: dErr } = await supabase
         .from("transactions")
-        .update({ date })
+        .update(patch)
         .eq("id", tx.id);
       if (dErr) {
         setSaving(false);
         return toast.error(dErr.message);
       }
     }
+
 
     // 2) Atualiza categoria (no atual ou em todos com mesma descrição)
     let query = supabase
@@ -945,6 +963,31 @@ function EditCategoryDialog({
               A alteração de data se aplica somente a este lançamento.
             </p>
           </div>
+
+          <div className="space-y-2">
+            <Label>Descrição</Label>
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Ex.: Supermercado"
+            />
+            <p className="text-xs text-muted-foreground">
+              A alteração de descrição se aplica somente a este lançamento.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Notas / comentários</Label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Anotações internas sobre esta transação"
+              rows={3}
+            />
+          </div>
+
+
+
 
 
           {!creating ? (
