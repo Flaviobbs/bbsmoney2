@@ -389,16 +389,38 @@ function DocumentosPage() {
     });
   };
 
-  const toggleSelectAll = (docId: string, total: number) => {
+  const matchesCategoryFilter = (docId: string, s: Suggestion) => {
+    const f = categoryFilter[docId];
+    if (!f || f === "all") return true;
+    if (f === "__none__") return !s.categoria || s.categoria.trim() === "";
+    const target = categories.find((c) => c.id === f);
+    if (!target) return true;
+    const allowedNames = new Set<string>([target.name.toLowerCase()]);
+    // se for pai, aceita também subcategorias
+    categories
+      .filter((c) => c.parent_id === target.id)
+      .forEach((c) => allowedNames.add(c.name.toLowerCase()));
+    return allowedNames.has((s.categoria ?? "").toLowerCase());
+  };
+
+  const visibleIndices = (docId: string): number[] => {
+    const ex = extractions[docId];
+    if (!ex) return [];
+    return ex.suggestions
+      .map((s, i) => ({ s, i }))
+      .filter(({ s }) => matchesCategoryFilter(docId, s))
+      .map(({ i }) => i);
+  };
+
+  const toggleSelectAll = (docId: string) => {
     setSelected((prev) => {
       const ex = extractions[docId];
-      const selectable = ex
-        ? ex.suggestions
-            .map((s, i) => (s.already_imported ? -1 : i))
-            .filter((i) => i >= 0)
-        : Array.from({ length: total }, (_, i) => i);
+      if (!ex) return prev;
+      const selectable = visibleIndices(docId).filter(
+        (i) => !ex.suggestions[i]?.already_imported,
+      );
       const set = prev[docId] ?? new Set<number>();
-      if (set.size >= selectable.length && selectable.every((i) => set.has(i)))
+      if (selectable.every((i) => set.has(i)) && selectable.length > 0)
         return { ...prev, [docId]: new Set() };
       return { ...prev, [docId]: new Set(selectable) };
     });
