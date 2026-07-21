@@ -58,7 +58,9 @@ interface Tx {
   account_id: string | null;
   card_last4: string | null;
   purchase_type: "cash" | "installment" | null;
+  notes: string | null;
 }
+
 
 interface Cat {
   id: string;
