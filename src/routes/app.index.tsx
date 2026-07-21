@@ -47,7 +47,14 @@ interface TxRow {
   category_id: string | null;
   card_last4: string | null;
   purchase_type: "cash" | "installment" | null;
+  document_id: string | null;
 }
+
+interface DocRow {
+  id: string;
+  file_name: string;
+}
+
 
 interface CatRow {
   id: string;
